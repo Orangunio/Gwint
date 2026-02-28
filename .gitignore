@@ -1,0 +1,141 @@
+# .NET Build / Binaries
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+x64/
+x86/
+[Aa]rchive/
+[Aa]rchives/
+
+# Test results
+[Tt]est[Rr]esult*/
+*.TestResult.xml
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+# NuGet
+packages/
+*.nupkg
+*.snk
+.nuget/
+global.json.lock
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.cache
+*.vs/
+.vs/
+.vscode/
+
+# Rider / ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+*.resharper.user
+
+# Visual Studio / MSBuild
+*.csproj.user
+*.csproj.DotSettings
+[Dd]ebugPS/
+[Rr]eleasePS/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rchive/
+[Aa]rchives/
+*.pdb
+*.cache
+*.vspscc
+*.vssscc
+build/
+publish/
+app.publish/
+*.Publish.xml
+*.pubxml
+*.publishproj
+
+# Entity Framework / Migrations
+**/Migrations/*.Designer.cs
+**/Migrations/*.ModelSnapshot.cs
+
+# Logs and databases
+*.log
+*.logs
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Dependency directories
+node_modules/
+jspm_packages/
+wwwroot/lib/
+wwwroot/node_modules/
+
+# Azure / Deployment
+*.azurePubxml
+*.publishsettings
+azuredeploy.json
+azuredeploy.parameters.json
+
+# Fakes / Shim / Microsoft Fakes
+FakesAssemblies/
+
+# JetBrains / Rider temporary files
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Cake / build scripts
+/tools/
+/artifacts/
+/publish/
+
+# Paket
+.paket/
+paket-files/
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# dotnet tool / local tools
+.tool-versions
+.dotnet/
+
+# Secret files (should be in .gitignore anyway)
+appsettings.*.json
+secrets.json
+*.secrets
+*.key
+*.pem
+*.pfx
+*.cer
+*.crt
+
+# macOS / Linux junk
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Temporary / backup files
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+*.temp
