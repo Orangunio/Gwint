@@ -22,6 +22,44 @@ namespace Backend.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Backend.Models.Card", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Strength")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ability")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("fraction")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("isChampion")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("isCommander")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("isSpecial")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("place")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Cards", "public");
+                });
+
             modelBuilder.Entity("Backend.Models.Player", b =>
                 {
                     b.Property<int>("Id")
