@@ -1,4 +1,5 @@
 using Backend.Database;
+using Backend.Hubs;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,5 +31,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.MapGet("/", () => "Hello Gwint World!");
+
+app.MapHub<RoomHub>("/roomHub");
 
 app.Run();

@@ -1,4 +1,6 @@
-﻿namespace Backend.Models
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Backend.Models
 {
     public class Player
     {
@@ -6,7 +8,10 @@
         public string Login { get; set; }
         public string HashPassword { get; set; }
 
-        private Player() { }
+        [NotMapped]
+        public string? ConnectionId { get; set; }
+
+        public Player() { }
 
         public Player(string login, string hashPassword)
         {
