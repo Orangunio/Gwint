@@ -1,6 +1,7 @@
 ﻿using Backend.Database;
 using Backend.Migrations;
 using Backend.Models.Body;
+using Backend.Models.Enums;
 using Backend.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,11 +39,37 @@ namespace Backend.Controllers
         [HttpPost("update-deck")]
         public async Task<IActionResult> UpdateDeck([FromBody] UpdateDeckBody body)
         {
-            var playerDecks = await dbContext.PlayerDecks
-                .Where(pd => pd.PlayerId == body.PlayerId)
+            Fractions fraction;
+            switch (body.Fraction)
+            {
+                case 1:
+                    fraction = Fractions.Nilfgaard;
+                    break;
+                case 2:
+                    fraction = Fractions.NorthernRealms;
+                    break;
+                case 3:
+                    fraction = Fractions.ScoiaTael;
+                    break;
+                case 4:
+                    fraction = Fractions.Monsters;
+                    break;
+                default:
+                    return BadRequest("Invalid fraction value.");
+            }
+
+            var existingCards = await dbContext.PlayerDecks
+                .Where(pd => pd.PlayerId == body.PlayerId && pd.Card.fraction == fraction)
+                .Select(pd => pd.CardId)
                 .ToListAsync();
 
-            foreach (var cardId in body.CardIdsToAdd.Except(playerDecks.Select(pd => pd.CardId)))
+            var cardsToAdd = await dbContext.Cards
+                .Where(c => body.CardIdsToAdd.Contains(c.Id) && c.fraction == fraction)
+                .Select(c => c.Id)
+                .Except(existingCards)
+                .ToListAsync();
+
+            foreach (var cardId in cardsToAdd)
             {
                 dbContext.PlayerDecks.Add(new Models.PlayerDeck
                 {
@@ -51,9 +78,11 @@ namespace Backend.Controllers
                 });
             }
 
-            var cardsToRemove = playerDecks
-                .Where(pd => body.CardIdsToRemove.Contains(pd.CardId))
-                .ToList();
+            var cardsToRemove = await dbContext.PlayerDecks
+                .Where(pd => pd.PlayerId == body.PlayerId
+                             && pd.Card.fraction == fraction
+                             && body.CardIdsToRemove.Contains(pd.CardId))
+                .ToListAsync();
 
             dbContext.PlayerDecks.RemoveRange(cardsToRemove);
 
