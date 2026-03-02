@@ -80,6 +80,53 @@ namespace Backend.Migrations
 
                     b.ToTable("Players", "public");
                 });
+
+            modelBuilder.Entity("Backend.Models.PlayerDeck", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CardId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.ToTable("PlayerDecks", "public");
+                });
+
+            modelBuilder.Entity("Backend.Models.PlayerDeck", b =>
+                {
+                    b.HasOne("Backend.Models.Card", "Card")
+                        .WithMany()
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Models.Player", "Player")
+                        .WithMany("PlayerDecks")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Card");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Backend.Models.Player", b =>
+                {
+                    b.Navigation("PlayerDecks");
+                });
 #pragma warning restore 612, 618
         }
     }

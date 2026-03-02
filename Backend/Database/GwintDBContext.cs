@@ -6,6 +6,7 @@ namespace Backend.Database
     {
         public DbSet<Models.Player> Players { get; set; }
         public DbSet<Models.Card> Cards { get; set; }
+        public DbSet<Models.PlayerDeck> PlayerDecks { get; set; }
         public GwintDBContext(DbContextOptions<GwintDBContext> options) : base(options)
         {
 

@@ -10,6 +10,7 @@ namespace Backend.Models
 
         [NotMapped]
         public string? ConnectionId { get; set; }
+        public ICollection<PlayerDeck> PlayerDecks { get; set; }
 
         public Player() { }
 

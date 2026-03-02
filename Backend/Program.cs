@@ -1,23 +1,56 @@
-using Backend.Database;
+﻿using Backend.Database;
 using Backend.Hubs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// ===== JWT CONFIG =====
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var secretKey = jwtSettings["SecretKey"]
+    ?? throw new InvalidOperationException("Brak Jwt:SecretKey");
 
+var key = Encoding.UTF8.GetBytes(secretKey);
+
+// ===== SERVICES =====
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<GwintDBContext>(options => 
-   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'GwintDBContext' not found.")));
+builder.Services.AddDbContext<GwintDBContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string not found.")));
 
 builder.Services.AddSignalR();
 
+// 🔥 JWT
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(key)
+    };
+});
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// ===== PIPELINE =====
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -29,9 +62,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<RoomHub>("/roomHub");
 
 app.MapGet("/", () => "Hello Gwint World!");
-
-app.MapHub<RoomHub>("/roomHub");
 
 app.Run();
