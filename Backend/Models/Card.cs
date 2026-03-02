@@ -1,4 +1,5 @@
 ﻿using Backend.Models.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend.Models
 {
@@ -9,6 +10,8 @@ namespace Backend.Models
         public Fractions fraction { get; set; }
         public Abilities ability { get; set; }
         public int Strength { get; set; }
+        [NotMapped]
+        public int finalStrength { get; set; }
         public Place place { get; set; }
         public bool isChampion { get; set; }
         public bool isCommander { get; set; }
@@ -26,6 +29,7 @@ namespace Backend.Models
             this.isChampion = isChampion;
             this.isCommander = isCommander;
             this.isSpecial = isSpecial;
+            this.finalStrength = Strength;
         }
     }
 }
