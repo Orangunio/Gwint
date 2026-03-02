@@ -36,6 +36,40 @@ namespace Backend.Controllers
             return Ok(playerDecks);
         }
 
+        [HttpGet("get-player-fraction-deck/{playerId}/{fraction}")]
+        public async Task<IActionResult> GetPlayerDecks(int playerId, int fraction)
+        {
+            Fractions fractionEnum;
+            switch (fraction)
+            {
+                case 1:
+                    fractionEnum = Fractions.Nilfgaard;
+                    break;
+                case 2:
+                    fractionEnum = Fractions.NorthernRealms;
+                    break;
+                case 3:
+                    fractionEnum = Fractions.ScoiaTael;
+                    break;
+                case 4:
+                    fractionEnum = Fractions.Monsters;
+                    break;
+                default:
+                    return BadRequest("Invalid fraction value.");
+            }
+
+            var playerDecks = await dbContext.PlayerDecks
+                .Where(pd => pd.PlayerId == playerId && pd.Card.fraction == fractionEnum)
+                .Select(pd => new
+                {
+                    pd.Id,
+                    pd.CardId,
+                    CardName = pd.Card.Name
+                })
+                .ToListAsync();
+            return Ok(playerDecks);
+        }
+
         [HttpPost("update-deck")]
         public async Task<IActionResult> UpdateDeck([FromBody] UpdateDeckBody body)
         {
