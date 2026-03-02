@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using System.Xml.Linq;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Backend.Hubs
 {
@@ -56,6 +55,17 @@ namespace Backend.Hubs
             }
 
             await base.OnDisconnectedAsync(exception);
+        }
+
+        public async Task StartGame(string roomId)
+        {
+            if (rooms.TryGetValue(roomId, out var room))
+            {
+                await Clients.Group(roomId).SendAsync("GameStarted", roomId);
+
+                var playerLogins = room.Players.Select(p => p.Login).ToList();
+                await Clients.Group(roomId).SendAsync("GameSetup", playerLogins);
+            }
         }
     }
 }
