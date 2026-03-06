@@ -26,6 +26,13 @@ namespace Backend.Controllers
         {
             PlayerUseCases playerUseCases = new PlayerUseCases();
             Player player = playerUseCases.CreatePlayer(request.Login, request.Password);
+
+            var login = _dbContext.Players.FirstOrDefault(p => p.Login == request.Login);
+            if (login != null)
+            {
+                return BadRequest("Użytkownik o takim loginie już istnieje.");
+            }
+
             _dbContext.Players.Add(player);
             await _dbContext.SaveChangesAsync();
             return new OkObjectResult(player);
