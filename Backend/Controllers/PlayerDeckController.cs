@@ -116,16 +116,21 @@ namespace Backend.Controllers
                 .Concat(cardsToAddFiltered)
                 .ToList();
 
-            var commandersCount = finalCards.Count(c => c.IsCommander);
+            var commandersCount = finalCards.Count(c => c.isCommander);
             if (commandersCount != 1)
             {
                 return BadRequest("Talia musi zawierać dokładnie jednego dowódcę.");
             }
 
-            var specialCardsCount = finalCards.Count(c => c.IsSpecial);
+            var specialCardsCount = finalCards.Count(c => c.isSpecial);
             if (specialCardsCount > 10)
             {
                 return BadRequest("Talia może zawierać maksymalnie 10 kart specjalnych.");
+            }
+
+            if(finalCards.Count < 26)
+            {
+                return BadRequest("Talia musi zawierać minimum 25 kart bez dowódcy");
             }
 
             foreach (var card in cardsToAddFiltered)
