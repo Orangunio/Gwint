@@ -5,6 +5,7 @@ using Backend.UseCases;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Numerics;
 
 namespace Backend.Hubs
 {
@@ -100,6 +101,54 @@ namespace Backend.Hubs
                 await Clients.Group(roomId)
                     .SendAsync("TurnStarted", player.ConnectionId);
             }
+        }
+
+        public async Task PlayCard(string roomId, Card selectedCardByUser)
+        {
+            var game = gameUseCases.games[roomId];
+
+            if (selectedCardByUser.isSpecial)
+            {
+                //Rozpatrzyc efekt w zaleznosci od card.ability
+            }
+            else if (selectedCardByUser.isCommander)
+            {
+                //Rozpatrzyc efekt w zaleznosci od card.ability
+
+                //Usun karte z gry
+            }
+            else
+            {
+                //Przypisac jednostke do odpowiedniego rzedu (Uwaga Szpieg)
+
+                //Rozpatrzec umiejetnosc jednostki jezeli taka posiada
+            }
+
+            if(game.CurrentPlayer == game.Player1)
+            {
+                if (game.Player2Passed)
+                {
+                    //Ponownie rusza się gracz 1
+                }
+                else
+                {
+                    game.CurrentPlayer = game.Player2;
+                }
+            }
+            else
+            {
+                if (game.Player1Passed)
+                {
+                    //Ponownie rusza się gracz 2
+                }
+                else
+                {
+                    game.CurrentPlayer = game.Player1;
+                }
+            }
+
+            await Clients.Group(roomId)
+                    .SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
         }
     }
 }
