@@ -124,7 +124,190 @@ namespace Backend.UseCases
             }
         }
 
+        public void ZwinnoscAbility(Game game, Card playedCard, int selectedRow)
+        {
+            var currentPlayer = game.CurrentPlayer;
 
+            List<Card> firstRow;
+            List<Card> secondRow;
+            List<Card> thirdRow;
+
+            if (currentPlayer == game.Player1)
+            {
+                firstRow = game.Board.Player1FirstCardRow;
+                secondRow = game.Board.Player1SecondCardRow;
+                thirdRow = game.Board.Player1ThirdCardRow;
+            }
+            else
+            {
+                firstRow = game.Board.Player2FirstCardRow;
+                secondRow = game.Board.Player2SecondCardRow;
+                thirdRow = game.Board.Player2ThirdCardRow;
+            }
+
+
+            if (selectedRow == 1 && (playedCard.place == Place.FirstRow || playedCard.place == Place.FirstAndSecondRow || playedCard.place == Place.FirstAndThirdRow || 
+                playedCard.place == Place.AllRows))
+            {
+                firstRow.Add(playedCard);
+            }
+            else if (selectedRow == 2 && (playedCard.place == Place.SecondRow || playedCard.place == Place.FirstAndSecondRow || playedCard.place == Place.SecondAndThirdRow ||
+                playedCard.place == Place.AllRows))
+            {
+                secondRow.Add(playedCard);
+            }
+            else if (selectedRow == 3 && (playedCard.place == Place.ThirdRow || playedCard.place == Place.FirstAndThirdRow || playedCard.place == Place.SecondAndThirdRow ||
+                playedCard.place == Place.AllRows))
+            {
+                thirdRow.Add(playedCard);
+            }
+        }
+
+        //Trzeba będzie dodać rozpatrywanie umiejętności karty po wskrzeszeniu
+        public void WskrzeszenieAbility(Game game, Card reviveCard)
+        {
+            var currentPlayer = game.CurrentPlayer;
+            List<Card> playerGraveyard;
+            List<Card> firstRow;
+            List<Card> secondRow;
+            List<Card> thirdRow;
+
+            if (currentPlayer == game.Player1)
+            {
+                playerGraveyard = game.Player1CardsOnDisplay;
+                firstRow = game.Board.Player1FirstCardRow;
+                secondRow = game.Board.Player1SecondCardRow;
+                thirdRow = game.Board.Player1ThirdCardRow;
+            }
+            else
+            {
+                playerGraveyard = game.Player2CardsOnDisplay;
+                firstRow = game.Board.Player2FirstCardRow;
+                secondRow = game.Board.Player2SecondCardRow;
+                thirdRow = game.Board.Player2ThirdCardRow;
+            }
+
+            if (reviveCard != null)
+            {
+                if (!playerGraveyard.Contains(reviveCard))
+                    return;
+
+                if (reviveCard.place == Place.FirstRow || reviveCard.place == Place.FirstAndSecondRow || reviveCard.place == Place.FirstAndThirdRow ||
+                    reviveCard.place == Place.AllRows)
+                {
+                    firstRow.Add(reviveCard);
+                }
+                else if (reviveCard.place == Place.SecondRow || reviveCard.place == Place.FirstAndSecondRow || reviveCard.place == Place.SecondAndThirdRow ||
+                    reviveCard.place == Place.AllRows)
+                {
+                    secondRow.Add(reviveCard);
+                }
+                else if (reviveCard.place == Place.ThirdRow || reviveCard.place == Place.FirstAndThirdRow || reviveCard.place == Place.SecondAndThirdRow ||
+                    reviveCard.place == Place.AllRows)
+                {
+                    thirdRow.Add(reviveCard);
+                }
+            }
+        }
+
+        public void WiezAbility(Game game, List<Card> row)
+        {
+            game.Board.CalculateRow(row, game.Board.FrostActive, game.Board.RogDowodcyActive[0, 0]);
+        }
+
+        public void WyzszeMoraleAbility(Game game, List<Card> row)
+        {
+            game.Board.CalculateRow(row, game.Board.FrostActive, game.Board.RogDowodcyActive[0, 0]);
+        }
+
+        public void PozogaJednostkiAbility(Game game, Card playedCard)
+        {
+            var currentPlayer = game.CurrentPlayer;
+
+            List<Card> enemyRow = new();
+            List<Card> enemyGraveyard;
+            bool weatherEffect = false;
+            bool hornEffect = false;
+
+            if (currentPlayer == game.Player1)
+            {
+                enemyGraveyard = game.Player2CardsOnDisplay;
+
+                if (playedCard.place == Place.FirstRow)
+                {
+                    enemyRow = game.Board.Player2FirstCardRow;
+                    weatherEffect = game.Board.FrostActive;
+                    hornEffect = game.Board.RogDowodcyActive[1, 0];
+                }
+                else if (playedCard.place == Place.SecondRow)
+                {
+                    enemyRow = game.Board.Player2SecondCardRow;
+                    weatherEffect = game.Board.FogActive;
+                    hornEffect = game.Board.RogDowodcyActive[1, 1];
+                }
+                else if (playedCard.place == Place.ThirdRow)
+                {
+                    enemyRow = game.Board.Player2ThirdCardRow;
+                    weatherEffect = game.Board.FogActive;
+                    hornEffect = game.Board.RogDowodcyActive[1, 2];
+                }
+            }
+            else
+            {
+                enemyGraveyard = game.Player1CardsOnDisplay;
+
+                if (playedCard.place == Place.FirstRow)
+                {
+                    enemyRow = game.Board.Player1FirstCardRow;
+                    weatherEffect = game.Board.FrostActive;
+                    hornEffect = game.Board.RogDowodcyActive[0, 0];
+                }
+                else if (playedCard.place == Place.SecondRow)
+                {
+                    enemyRow = game.Board.Player1SecondCardRow;
+                    weatherEffect = game.Board.FogActive;
+                    hornEffect = game.Board.RogDowodcyActive[0, 1];
+                }
+                else if (playedCard.place == Place.ThirdRow)
+                {
+                    enemyRow = game.Board.Player1ThirdCardRow;
+                    weatherEffect = game.Board.FogActive;
+                    hornEffect = game.Board.RogDowodcyActive[0, 2];
+                }
+            }
+
+            // przelicz rząd
+            game.Board.CalculateRow(enemyRow, weatherEffect, hornEffect);
+
+            int strengthSum = enemyRow.Sum(c => c.finalStrength);
+
+            if (strengthSum >= 10)
+            {
+                int maxStrength = enemyRow
+                    .Where(c => !c.isChampion)
+                    .Max(c => c.finalStrength);
+
+                var cardsToDestroy = enemyRow
+                    .Where(c => !c.isChampion && c.finalStrength == maxStrength)
+                    .ToList();
+
+                foreach (var card in cardsToDestroy)
+                {
+                    enemyRow.Remove(card);
+                    enemyGraveyard.Add(card);
+                }
+            }
+        }
+
+        public void RogDowodcyJednostkiAbility(Game game, List<Card> row)
+        {
+            game.Board.CalculateRow(row, game.Board.FrostActive, game.Board.RogDowodcyActive[0, 0]);
+        }
+
+        public void BydleceSilyZbrojneAbility()
+        {
+            //Dodać trzeba BSZ do pierwszego rzędu
+        }
         #endregion
     }
 }
