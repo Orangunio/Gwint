@@ -12,11 +12,11 @@
         wiez = 5,
         wyzszeMorale = 6,
         pozoga = 7,
-        rogDowodcy = 8,
+        rogDowodcyJednostki = 8,
         bydleceSilyZbrojne = 9,
 
         //Umiejętności dla kart specjalnych
-        rógDowódcy = 10,
+        rogDowodcy = 10,
         pożoga = 11,
         manekinDoCwiczen = 12,
         trzaskajacyMroz = 13,
