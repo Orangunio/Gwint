@@ -11,13 +11,13 @@
         wskrzeszenie = 4,
         wiez = 5,
         wyzszeMorale = 6,
-        pozoga = 7,
+        pozogaJednostki = 7,
         rogDowodcyJednostki = 8,
         bydleceSilyZbrojne = 9,
 
         //Umiejętności dla kart specjalnych
         rogDowodcy = 10,
-        pożoga = 11,
+        pozoga = 11,
         manekinDoCwiczen = 12,
         trzaskajacyMroz = 13,
         gestaMgla = 14,
