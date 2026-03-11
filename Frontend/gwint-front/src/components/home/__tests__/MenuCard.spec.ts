@@ -59,4 +59,41 @@ describe('MenuCard', () => {
 
         expect(wrapper.emitted('click')).toBeFalsy()
     })
+    it('nie renderuje badge, gdy nie został przekazany', () => {
+        const wrapper = mount(MenuCard, {
+            props: {
+                title: 'Gra Online',
+                description: 'Opis',
+                icon: 'mdi-sword-cross',
+            },
+        })
+
+        expect(wrapper.text()).not.toContain('Dostępne')
+    })
+
+    it('renderuje overlay z napisem "Wkrótce", gdy komponent jest disabled', () => {
+        const wrapper = mount(MenuCard, {
+            props: {
+                title: 'Gra Online',
+                description: 'Opis',
+                icon: 'mdi-sword-cross',
+                disabled: true,
+            },
+        })
+
+        expect(wrapper.text()).toContain('Wkrótce')
+    })
+
+    it('dodaje klasę disabled, gdy komponent jest zablokowany', () => {
+        const wrapper = mount(MenuCard, {
+            props: {
+                title: 'Gra Online',
+                description: 'Opis',
+                icon: 'mdi-sword-cross',
+                disabled: true,
+            },
+        })
+
+        expect(wrapper.classes()).toContain('menu-card--disabled')
+    })
 })
