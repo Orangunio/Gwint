@@ -17,7 +17,11 @@
             </v-col>
           </v-row>
 
-          <v-row class="mb-8" justify="center">
+          <v-row
+              v-if="playerStore.isLoggedIn && playerStore.player"
+              class="mb-8"
+              justify="center"
+          >
             <v-col cols="12" md="6" sm="8">
               <PlayerStats />
             </v-col>

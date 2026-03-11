@@ -5,7 +5,7 @@
       :class="{ 'header-scrolled': isScrolled }"
   >
     <v-app-bar-title>
-      <div class="d-flex align-center ga-2">
+      <div class="d-flex align-center ga-2 header-brand" @click="router.push({ name: 'home' })">
         <v-icon icon="mdi-cards-playing" color="amber-darken-2" size="32" />
         <span class="header-title">GWINT</span>
       </div>
@@ -113,5 +113,9 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   background: rgba(18, 18, 18, 0.95) !important;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 215, 64, 0.15);
+}
+
+.header-brand {
+  cursor: pointer;
 }
 </style>
