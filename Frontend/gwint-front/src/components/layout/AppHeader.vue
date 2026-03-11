@@ -16,7 +16,7 @@
         <template v-if="playerStore.isLoggedIn">
           <v-chip color="amber-darken-2" variant="outlined" size="small">
             <v-icon start icon="mdi-sword" />
-            Poziom {{ playerStore.player?.level }}
+            Poziom {{ playerStore.player?.level ?? 1 }}
           </v-chip>
 
           <v-menu>
@@ -25,14 +25,20 @@
                 <v-icon icon="mdi-account-circle" size="28" />
               </v-btn>
             </template>
-            <v-list density="compact" min-width="160">
-              <v-list-item prepend-icon="mdi-account" title="Profil" />
-              <v-list-item prepend-icon="mdi-cog" title="Ustawienia" />
+
+            <v-list density="compact" min-width="180">
+              <v-list-item
+                  prepend-icon="mdi-account"
+                  :title="playerStore.displayName"
+                  subtitle="Zalogowany gracz"
+              />
+
               <v-divider />
+
               <v-list-item
                   prepend-icon="mdi-logout"
                   title="Wyloguj"
-                  @click="playerStore.logout()"
+                  @click="handleLogout"
               />
             </v-list>
           </v-menu>
@@ -44,6 +50,7 @@
             variant="outlined"
             size="small"
             prepend-icon="mdi-login"
+            @click="goToLogin"
         >
           Zaloguj się
         </v-btn>
@@ -62,9 +69,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAppStore } from '@/stores/app'
 
+const router = useRouter()
 const playerStore = usePlayerStore()
 const appStore = useAppStore()
 
@@ -72,6 +81,16 @@ const isScrolled = ref(false)
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 20
+}
+
+function goToLogin() {
+  router.push({ name: 'login' })
+}
+
+function handleLogout() {
+  playerStore.logout()
+  appStore.addNotification('Zostałeś wylogowany.')
+  router.push({ name: 'home' })
 }
 
 onMounted(() => window.addEventListener('scroll', handleScroll))

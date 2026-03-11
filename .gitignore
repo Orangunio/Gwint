@@ -139,3 +139,20 @@ desktop.ini
 *.bak
 *.tmp
 *.temp
+
+# Frontend/Vite/Vue
+dist/
+dist-ssr/
+*.local
+.env
+.env.*
+!.env.example
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# cache
+.vite/

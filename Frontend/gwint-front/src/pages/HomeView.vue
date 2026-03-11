@@ -1,6 +1,6 @@
 <template>
   <div>
-    <AppHeader @open-login="handleOpenLogin" />
+    <AppHeader />
 
     <v-main>
       <HeroSection
@@ -81,15 +81,6 @@
   const router = useRouter()
   const appStore = useAppStore()
   const playerStore = usePlayerStore()
-
-  function handleOpenLogin () {
-    if (playerStore.isLoggedIn) {
-      appStore.addNotification(`Jesteś już zalogowany jako ${playerStore.displayName}.`)
-      return
-    }
-
-    router.push({ name: 'login' })
-  }
 
   function handleStartGame () {
     if (!playerStore.isLoggedIn) {
