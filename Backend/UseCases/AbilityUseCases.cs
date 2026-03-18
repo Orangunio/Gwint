@@ -309,5 +309,124 @@ namespace Backend.UseCases
             //Dodać trzeba BSZ do pierwszego rzędu
         }
         #endregion
+
+        #region Umiejetnosci kart specjalnych
+
+        public void RogDowodcy(Game game)
+        {
+            game.Board.CalculateRowScores();
+        }
+
+        public void Pozoga(Game game)
+        {
+            int maxStrength = 0;
+
+            var allCards = game.Board.Player1FirstCardRow
+            .Concat(game.Board.Player1SecondCardRow)
+            .Concat(game.Board.Player1ThirdCardRow)
+            .Concat(game.Board.Player2FirstCardRow)
+            .Concat(game.Board.Player2SecondCardRow)
+            .Concat(game.Board.Player2ThirdCardRow)
+            .ToList();
+
+            if (allCards.Any())
+            {
+                maxStrength = allCards.Max(c => c.finalStrength);
+            }
+
+            void RemoveStrongest(List<Card> row, List<Card> graveyard)
+            {
+                var toRemove = row
+                    .Where(c => c.finalStrength == maxStrength && !c.isChampion)
+                    .ToList();
+
+                foreach (var card in toRemove)
+                {
+                    row.Remove(card);
+                    graveyard.Add(card);
+                }
+            }
+
+            // Player 1
+            RemoveStrongest(game.Board.Player1FirstCardRow, game.Player1CardsOnDisplay);
+            RemoveStrongest(game.Board.Player1SecondCardRow, game.Player1CardsOnDisplay);
+            RemoveStrongest(game.Board.Player1ThirdCardRow, game.Player1CardsOnDisplay);
+
+            // Player 2
+            RemoveStrongest(game.Board.Player2FirstCardRow, game.Player2CardsOnDisplay);
+            RemoveStrongest(game.Board.Player2SecondCardRow, game.Player2CardsOnDisplay);
+            RemoveStrongest(game.Board.Player2ThirdCardRow, game.Player2CardsOnDisplay);
+        }
+
+        public void ManekinDoCwiczenAbility(Game game, Card selectedCard)
+        {
+            var currentPlayer = game.CurrentPlayer;
+
+            List<Card> playerHand;
+
+            List<List<Card>> playerRows;
+
+            if (currentPlayer == game.Player1)
+            {
+                playerHand = game.Player1CardsOnHand;
+
+                playerRows = new List<List<Card>>
+                {
+                    game.Board.Player1FirstCardRow,
+                    game.Board.Player1SecondCardRow,
+                    game.Board.Player1ThirdCardRow
+                 };
+            }
+            else
+            {
+                playerHand = game.Player2CardsOnHand;
+
+                playerRows = new List<List<Card>>
+                {
+                    game.Board.Player2FirstCardRow,
+                    game.Board.Player2SecondCardRow,
+                    game.Board.Player2ThirdCardRow
+                };
+            }
+
+            // znajdź kartę na planszy
+            foreach (var row in playerRows)
+            {
+                if (row.Contains(selectedCard))
+                {
+                    row.Remove(selectedCard);
+                    playerHand.Add(selectedCard);
+                    break;
+                }
+            }
+        }
+
+        public void TrzaskajacyMrozAbility(Game game)
+        {
+            game.Board.FrostActive = true;
+            game.Board.CalculateRowScores();
+        }
+
+        public void GestaMglaAbility(Game game)
+        {
+            game.Board.FogActive = true;
+            game.Board.CalculateRowScores();
+        }
+
+        public void UlewnyDeszczAbility(Game game)
+        {
+            game.Board.RainActive = true;
+            game.Board.CalculateRowScores();
+        }
+
+        public void CzysteNieboAbility(Game game)
+        {
+            game.Board.FrostActive = false;
+            game.Board.FogActive = false;
+            game.Board.RainActive = false;
+
+            game.Board.CalculateRowScores();
+        }
+        #endregion
     }
 }
