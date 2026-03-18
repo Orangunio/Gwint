@@ -12,7 +12,7 @@ namespace Backend.UseCases
 
         #region Helper
 
-        private void AddCardToBoard(Game game, Player player, Place place, Card card)
+        public void AddCardToBoard(Game game, Player player, Place place, Card card)
         {
             bool isPlayer1 = player == game.Player1;
 
@@ -210,14 +210,14 @@ namespace Backend.UseCases
             }
         }
 
-        public void WiezAbility(Game game, List<Card> row)
+        public void WiezAbility(Game game)
         {
-            game.Board.CalculateRow(row, game.Board.FrostActive, game.Board.RogDowodcyActive[0, 0]);
+            game.Board.CalculateRowScores();
         }
 
-        public void WyzszeMoraleAbility(Game game, List<Card> row)
+        public void WyzszeMoraleAbility(Game game)
         {
-            game.Board.CalculateRow(row, game.Board.FrostActive, game.Board.RogDowodcyActive[0, 0]);
+            game.Board.CalculateRowScores();
         }
 
         public void PozogaJednostkiAbility(Game game, Card playedCard)
@@ -299,9 +299,9 @@ namespace Backend.UseCases
             }
         }
 
-        public void RogDowodcyJednostkiAbility(Game game, List<Card> row)
+        public void RogDowodcyJednostkiAbility(Game game)
         {
-            game.Board.CalculateRow(row, game.Board.FrostActive, game.Board.RogDowodcyActive[0, 0]);
+            game.Board.CalculateRowScores();
         }
 
         public void BydleceSilyZbrojneAbility()

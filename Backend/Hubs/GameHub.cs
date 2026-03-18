@@ -13,10 +13,12 @@ namespace Backend.Hubs
     {
         private readonly GameUseCases gameUseCases;
         private readonly GwintDBContext gwintDBContext;
+        private AbilityUseCases abilityUseCases;
         public GameHub(GameUseCases gameUseCases, GwintDBContext gwintDBContext) 
         { 
             this.gameUseCases = gameUseCases;
             this.gwintDBContext = gwintDBContext;
+            this.abilityUseCases = new AbilityUseCases();
         }
 
         public async Task StartGame(string roomId, Fractions player1SelectedFraction, Fractions player2SelectedFraction)
@@ -79,6 +81,34 @@ namespace Backend.Hubs
                 .SendAsync("TurnStarted", player.ConnectionId);
         }
 
+        public async Task PlayerPass(string roomId)
+        {
+            var game = gameUseCases.games[roomId];
+
+            var player = game.CurrentPlayer;
+
+            if(game.CurrentPlayer == game.Player1)
+            {
+                game.Player1Passed = true;
+                game.CurrentPlayer = game.Player2;
+            }
+            else
+            {
+                game.Player2Passed = true;
+                game.CurrentPlayer = game.Player1;
+            }
+
+            if(game.Player1Passed == true &&  game.Player2Passed == true)
+            {
+                //Powinien byc tutaj reset rundy
+            }
+            else
+            {
+                await Clients.Group(roomId)
+                    .SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
+            }
+        }
+
         public async Task ChooseFirstPlayer(string roomId)
         {
             var game = gameUseCases.games[roomId];
@@ -119,16 +149,62 @@ namespace Backend.Hubs
             }
             else
             {
-                //Przypisac jednostke do odpowiedniego rzedu (Uwaga Szpieg)
+                //Przypisac jednostke do odpowiedniego rzedu (Uwaga nie wstawiamy szpiega i zwinnosci bo robi to umiejetnosc)
+                if(!(selectedCardByUser.ability == Abilities.szpieg || selectedCardByUser.ability == Abilities.zwinnośc))
+                {
+                    abilityUseCases.AddCardToBoard(game, game.CurrentPlayer, selectedCardByUser.place ,selectedCardByUser);
+                }
 
                 //Rozpatrzec umiejetnosc jednostki jezeli taka posiada
+                if (selectedCardByUser.ability != Abilities.brak)
+                {
+                    switch (selectedCardByUser.ability)
+                    {
+                        case Abilities.braterstwo:
+                            abilityUseCases.BraterstwoAbility(game, selectedCardByUser);
+                            break;
+
+                        case Abilities.szpieg:
+                            abilityUseCases.SzpiegAbility(game, selectedCardByUser);
+                            break;
+
+                        case Abilities.zwinnośc:
+                            //Tutaj jakos trzeba wybrac do ktorego rzedu uzytkownik wybral zeby wstawic karte
+                            //abilityUseCases.ZwinnoscAbility(game, selectedCardByUser, selectedRow);
+                            break;
+
+                        case Abilities.wskrzeszenie:
+                            //Uzytkownik bedzie musial wskazac karte ktora wskrzesi
+                            break;
+
+                        case Abilities.wiez:
+                            abilityUseCases.WiezAbility(game);
+                            break;
+
+                        case Abilities.wyzszeMorale:
+                            abilityUseCases.WyzszeMoraleAbility(game);
+                            break;
+
+                        case Abilities.pozogaJednostki:
+                            abilityUseCases.PozogaJednostkiAbility(game, selectedCardByUser);
+                            break;
+
+                        case Abilities.rogDowodcy:
+                            abilityUseCases.RogDowodcyJednostkiAbility(game);
+                            break;
+
+                        case Abilities.bydleceSilyZbrojne:
+                            abilityUseCases.BydleceSilyZbrojneAbility();
+                            break;
+                    }
+                }
             }
 
             if(game.CurrentPlayer == game.Player1)
             {
                 if (game.Player2Passed)
                 {
-                    //Ponownie rusza się gracz 1
+                    game.CurrentPlayer = game.Player1;
                 }
                 else
                 {
@@ -139,7 +215,7 @@ namespace Backend.Hubs
             {
                 if (game.Player1Passed)
                 {
-                    //Ponownie rusza się gracz 2
+                    game.CurrentPlayer = game.Player2;
                 }
                 else
                 {
