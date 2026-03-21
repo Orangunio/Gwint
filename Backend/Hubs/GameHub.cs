@@ -133,98 +133,136 @@ namespace Backend.Hubs
             }
         }
 
-        public async Task PlayCard(string roomId, Card selectedCardByUser)
+        public async Task PlayCard(string roomId, Card selectedCardByUser, int? selectedRow = null)
         {
-            var game = gameUseCases.games[roomId];
+            if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
+            var currentPlayer = game.CurrentPlayer;
 
-            if (selectedCardByUser.isSpecial)
-            {
-                //Rozpatrzyc efekt w zaleznosci od card.ability
-            }
-            else if (selectedCardByUser.isCommander)
-            {
-                //Rozpatrzyc efekt w zaleznosci od card.ability
+            var playerHand = currentPlayer == game.Player1 ? game.Player1CardsOnHand : game.Player2CardsOnHand;
+            var cardInHand = playerHand.FirstOrDefault(c => c.Id == selectedCardByUser.Id);
 
-                //Usun karte z gry
-            }
-            else
+            if (cardInHand == null && !selectedCardByUser.isCommander) return;
+            if (cardInHand != null) playerHand.Remove(cardInHand);
+
+            if (!selectedCardByUser.isSpecial && !selectedCardByUser.isCommander)
             {
-                //Przypisac jednostke do odpowiedniego rzedu (Uwaga nie wstawiamy szpiega i zwinnosci bo robi to umiejetnosc)
-                if(!(selectedCardByUser.ability == Abilities.szpieg || selectedCardByUser.ability == Abilities.zwinnośc))
+                if (selectedCardByUser.ability != Abilities.szpieg && selectedCardByUser.ability != Abilities.zwinnośc)
                 {
-                    abilityUseCases.AddCardToBoard(game, game.CurrentPlayer, selectedCardByUser.place ,selectedCardByUser);
-                }
-
-                //Rozpatrzec umiejetnosc jednostki jezeli taka posiada
-                if (selectedCardByUser.ability != Abilities.brak)
-                {
-                    switch (selectedCardByUser.ability)
-                    {
-                        case Abilities.braterstwo:
-                            abilityUseCases.BraterstwoAbility(game, selectedCardByUser);
-                            break;
-
-                        case Abilities.szpieg:
-                            abilityUseCases.SzpiegAbility(game, selectedCardByUser);
-                            break;
-
-                        case Abilities.zwinnośc:
-                            //Tutaj jakos trzeba wybrac do ktorego rzedu uzytkownik wybral zeby wstawic karte
-                            //abilityUseCases.ZwinnoscAbility(game, selectedCardByUser, selectedRow);
-                            break;
-
-                        case Abilities.wskrzeszenie:
-                            //Uzytkownik bedzie musial wskazac karte ktora wskrzesi
-                            break;
-
-                        case Abilities.wiez:
-                            abilityUseCases.WiezAbility(game);
-                            break;
-
-                        case Abilities.wyzszeMorale:
-                            abilityUseCases.WyzszeMoraleAbility(game);
-                            break;
-
-                        case Abilities.pozogaJednostki:
-                            abilityUseCases.PozogaJednostkiAbility(game, selectedCardByUser);
-                            break;
-
-                        case Abilities.rogDowodcy:
-                            abilityUseCases.RogDowodcyJednostkiAbility(game);
-                            break;
-
-                        case Abilities.bydleceSilyZbrojne:
-                            abilityUseCases.BydleceSilyZbrojneAbility();
-                            break;
-                    }
+                    abilityUseCases.AddCardToBoard(game, currentPlayer, selectedCardByUser.place, selectedCardByUser);
                 }
             }
+            await ExecuteCardAbility(roomId, game, selectedCardByUser, selectedRow);
+            bool needsInteraction = selectedCardByUser.ability == Abilities.manekinDoCwiczen ||
+                                   (selectedCardByUser.ability == Abilities.wskrzeszenie && HasRevivableCards(game)) ||
+                                   (selectedCardByUser.ability == Abilities.zwinnośc && selectedRow == null);
 
-            if(game.CurrentPlayer == game.Player1)
+            if (!needsInteraction)
             {
-                if (game.Player2Passed)
-                {
-                    game.CurrentPlayer = game.Player1;
-                }
-                else
-                {
-                    game.CurrentPlayer = game.Player2;
-                }
+                await FinishTurn(roomId, game);
+            }
+        }
+        private async Task FinishTurn(string roomId, Game game)
+        {
+            game.Board.CalculateRowScores();
+            if (game.CurrentPlayer == game.Player1)
+            {
+                game.CurrentPlayer = game.Player2Passed ? game.Player1 : game.Player2;
             }
             else
             {
-                if (game.Player1Passed)
-                {
-                    game.CurrentPlayer = game.Player2;
-                }
-                else
-                {
-                    game.CurrentPlayer = game.Player1;
-                }
+                game.CurrentPlayer = game.Player1Passed ? game.Player2 : game.Player1;
             }
 
-            await Clients.Group(roomId)
-                    .SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
+            await Clients.Group(roomId).SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
+        }
+        private bool HasRevivableCards(Game game)
+        {
+            var graveyard = game.CurrentPlayer == game.Player1 ? game.Player1CardsOnDisplay : game.Player2CardsOnDisplay;
+            return graveyard.Any(c => !c.isChampion && !c.isSpecial);
+        }
+        public async Task ResolveResurrection(string roomId, int cardToReviveId)
+        {
+            if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
+            var graveyard = game.CurrentPlayer == game.Player1 ? game.Player1CardsOnDisplay : game.Player2CardsOnDisplay;
+            var cardToRevive = graveyard.FirstOrDefault(c => c.Id == cardToReviveId);
+
+            if (cardToRevive != null)
+            {
+                graveyard.Remove(cardToRevive);
+                if (cardToRevive.ability != Abilities.zwinnośc)
+                    abilityUseCases.AddCardToBoard(game, game.CurrentPlayer, cardToRevive.place, cardToRevive);
+
+                await ExecuteCardAbility(roomId, game, cardToRevive);
+                if (cardToRevive.ability != Abilities.wskrzeszenie && cardToRevive.ability != Abilities.zwinnośc)
+                {
+                    await FinishTurn(roomId, game);
+                }
+            }
+        }
+
+        public async Task ResolveDecoy(string roomId, int targetCardId)
+        {
+            if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
+
+            var playerRows = game.CurrentPlayer == game.Player1
+                ? new[] { game.Board.Player1FirstCardRow, game.Board.Player1SecondCardRow, game.Board.Player1ThirdCardRow }
+                : new[] { game.Board.Player2FirstCardRow, game.Board.Player2SecondCardRow, game.Board.Player2ThirdCardRow };
+
+            Card cardOnBoard = null;
+            foreach (var row in playerRows)
+            {
+                cardOnBoard = row.FirstOrDefault(c => c.Id == targetCardId);
+                if (cardOnBoard != null && !cardOnBoard.isChampion)
+                {
+                    abilityUseCases.ManekinDoCwiczenAbility(game, cardOnBoard);
+                    await FinishTurn(roomId, game);
+                    break;
+                }
+            }
+        }
+
+        private async Task ExecuteCardAbility(string roomId, Game game, Card card, int? selectedRow = null)
+        {
+            if (card.isCommander)
+            {
+                return;
+            }
+
+            switch (card.ability)
+            {
+                case Abilities.trzaskajacyMroz: abilityUseCases.TrzaskajacyMrozAbility(game); break;
+                case Abilities.gestaMgla: abilityUseCases.GestaMglaAbility(game); break;
+                case Abilities.ulewnyDeszcz: abilityUseCases.UlewnyDeszczAbility(game); break;
+                case Abilities.czysteNiebo: abilityUseCases.CzysteNieboAbility(game); break;
+                case Abilities.pozoga: abilityUseCases.Pozoga(game); break;
+                case Abilities.manekinDoCwiczen:
+                    await Clients.Caller.SendAsync("SelectCardToDecoy", card.Id);
+                    break;
+                case Abilities.wskrzeszenie:
+                    if (HasRevivableCards(game))
+                        await Clients.Caller.SendAsync("RequestResurrectionTarget");
+                    break;
+                case Abilities.zwinnośc:
+                    if (selectedRow == null)
+                        await Clients.Caller.SendAsync("RequestAgilityRow", card.Id);
+                    else
+                        abilityUseCases.ZwinnoscAbility(game, card, (int)selectedRow);
+                    break;
+                case Abilities.szpieg:
+                    abilityUseCases.SzpiegAbility(game, card);
+                    break;
+                case Abilities.braterstwo:
+                    abilityUseCases.BraterstwoAbility(game, card);
+                    break;
+                case Abilities.pozogaJednostki:
+                    abilityUseCases.PozogaJednostkiAbility(game, card);
+                    break;
+                default:
+                    // Dla pasywnych skilli jak Więź czy Morale
+                    abilityUseCases.WiezAbility(game);
+                    abilityUseCases.WyzszeMoraleAbility(game);
+                    break;
+            }
         }
     }
 }
