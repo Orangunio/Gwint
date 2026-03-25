@@ -9,36 +9,46 @@ namespace Backend.Hubs
     {
         public static ConcurrentDictionary<string, Room> rooms = new();
 
-        public string CreateRoom(string connectionId, string name)
+        public async Task<string> CreateRoom(string name) 
         {
-            var roomId = Guid.NewGuid().ToString()[..6];
-
+            var roomId = Guid.NewGuid().ToString()[..6].ToUpper(); 
             var room = new Room { Id = roomId };
 
             room.Players.Add(new Player
             {
-                ConnectionId = connectionId,
+                ConnectionId = Context.ConnectionId, 
                 Login = name
             });
 
             rooms.TryAdd(roomId, room);
+            await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
             return roomId;
         }
 
-        public async Task JoinRoom(string roomId, string connectionId, string name)
+        public async Task JoinRoom(string roomId, string name) 
         {
             if (rooms.TryGetValue(roomId, out var room))
             {
-                room.Players.Add(new Player
+                if (!room.Players.Any(p => p.ConnectionId == Context.ConnectionId))
                 {
-                    ConnectionId = connectionId,
-                    Login = name
-                });
+                    room.Players.Add(new Player
+                    {
+                        ConnectionId = Context.ConnectionId,
+                        Login = name
+                    });
+                }
 
                 await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
-
-                await Clients.Group(roomId).SendAsync("PlayerJoined");
+                
+                await Clients.Group(roomId).SendAsync("PlayerJoined", name);
+                
+                var playerLogins = room.Players.Select(p => p.Login).ToList();
+                await Clients.Caller.SendAsync("RoomUpdate", playerLogins);
+            }
+            else 
+            {
+                await Clients.Caller.SendAsync("Error", "Nie znaleziono pokoju o podanym kodzie.");
             }
         }
 
@@ -65,6 +75,13 @@ namespace Backend.Hubs
 
                 var playerLogins = room.Players.Select(p => p.Login).ToList();
                 await Clients.Group(roomId).SendAsync("GameSetup", playerLogins);
+            }
+        }
+        public async Task BroadcastFraction(string roomId, int fraction)
+        {
+            if (rooms.TryGetValue(roomId, out var room))
+            {
+                await Clients.OthersInGroup(roomId).SendAsync("FractionSelected", fraction);
             }
         }
     }

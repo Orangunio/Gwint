@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Backend.UseCases;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,7 @@ builder.Services.AddDbContext<GwintDBContext>(options =>
         ?? throw new InvalidOperationException("Connection string not found.")));
 
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<GameUseCases>();
 
 builder.Services.AddCors(options =>
 {
@@ -32,7 +34,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins("http://localhost:5173")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -76,6 +79,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<RoomHub>("/roomHub");
+app.MapHub<GameHub>("/gameHub");
 
 app.MapGet("/", () => "Hello Gwint World!");
 

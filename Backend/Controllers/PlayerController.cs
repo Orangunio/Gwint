@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers
 {
@@ -74,6 +75,11 @@ namespace Backend.Controllers
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor
             {
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.Name, player.Login),
+                    new Claim("playerId", player.Id.ToString())
+                }),
                 Expires = DateTime.UtcNow.AddHours(1),
                 Issuer = configuration["Jwt:Issuer"] ?? "gwint-api",
                 Audience = configuration["Jwt:Audience"] ?? "gwint-client",
@@ -87,5 +93,26 @@ namespace Backend.Controllers
 
             return Ok(new { token = jwt });
         }
+
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMe()
+        {
+            var playerIdClaim = User.Claims.FirstOrDefault(c => c.Type == "playerId")?.Value;
+            
+            if (!int.TryParse(playerIdClaim, out var playerId))
+                return Unauthorized("Nieprawidłowy token.");
+        
+            var player = await _dbContext.Players
+                .FirstOrDefaultAsync(p => p.Id == playerId);
+        
+            if (player == null)
+                return NotFound("Gracz nie znaleziony.");
+        
+            return Ok(new { player.Id, player.Login });
+        }
+        
     }
+
+    
 }
