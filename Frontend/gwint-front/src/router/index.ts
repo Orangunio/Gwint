@@ -5,6 +5,9 @@ import RegisterView from '@/pages/RegisterView.vue'
 import LobbyView from '@/pages/LobbyView.vue'
 import FractionSelectView from '@/pages/FractionSelectView.vue'
 import GameView from '@/pages/GameView.vue'
+import CreateRoom from '@/pages/CreateRoom.vue'
+import JoinRoom from '@/pages/JoinRoom.vue'
+import Room from '@/pages/Room.vue'
 import { usePlayerStore } from '@/stores/player'
 
 const router = createRouter({
@@ -44,6 +47,21 @@ const router = createRouter({
       name: 'game',
       component: GameView,
       meta: { requiresAuth: true },
+    },
+    {
+      path: '/create-room',
+      name: 'create-room',
+      component: CreateRoom,
+    },
+    {
+      path: '/join',
+      name: 'join-room',
+      component: JoinRoom,
+    },
+    {
+      path: '/room/:roomId',
+      name: 'Room',
+      component: Room,
     },
   ],
 })
