@@ -33,7 +33,7 @@
                 variant="elevated"
                 prepend-icon="mdi-sword"
                 class="hero-btn-primary"
-                @click="$emit('startGame')"
+                @click="goToLobby"
             >
               Zagraj Teraz
             </v-btn>
@@ -73,10 +73,23 @@
 </template>
 
 <script setup lang="ts">
-defineEmits<{
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+// Definiujemy emisję zdarzeń (opcjonalnie, jeśli rodzic nadal ma o tym wiedzieć)
+const emit = defineEmits<{
   startGame: []
   learnMore: []
 }>()
+
+const goToLobby = () => {
+  // 1. Emitujemy zdarzenie do rodzica (jeśli potrzebne)
+  emit('startGame') 
+  
+  // 2. Wykonujemy faktyczne przekierowanie na podstronę /lobby
+  router.push('/lobby')
+}
 
 const heroStats = [
   { value: '200+', label: 'Kart' },
