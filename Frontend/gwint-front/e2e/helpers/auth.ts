@@ -24,6 +24,19 @@ export async function mockLoginError(page: Page, message = 'Nieprawidłowy login
     })
 }
 
+export async function mockFetchMe(page: Page, id = 123, login = 'geralt') {
+    await page.route('**/api/player/me', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                id,
+                login,
+            }),
+        })
+    })
+}
+
 export async function mockRegisterSuccess(page: Page) {
     await page.route('**/api/player/register', async route => {
         await route.fulfill({

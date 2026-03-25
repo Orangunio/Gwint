@@ -1,52 +1,91 @@
 import { test, expect } from '@playwright/test'
-import { mockLoginSuccess, mockLoginError } from './helpers/auth'
+import { mockRegisterSuccess, mockRegisterError } from './helpers/auth'
 
-test.describe('Login', () => {
-    test('użytkownik może się zalogować', async ({ page }) => {
-        await mockLoginSuccess(page)
+test.describe('Register', () => {
+    test('pokazuje błąd gdy hasła nie są takie same', async ({ page }) => {
+        await page.goto('/register')
 
-        await page.goto('/login')
+        const form = page.locator('form')
 
-        await expect(page.getByRole('heading', { name: /Zaloguj się do GWINTA/i })).toBeVisible()
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('ciri')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('haslo123')
+        await form.getByRole('textbox', { name: 'Powtórz hasło', exact: true }).fill('innehaslo')
 
-        await page.getByLabel('Login').fill('geralt')
-        await page.getByLabel('Hasło').fill('tajnehaslo')
+        await form.getByRole('button', { name: 'Utwórz konto', exact: true }).click()
 
-        await page.getByRole('button', { name: 'Zaloguj się' }).click()
-
-        await expect(page).toHaveURL('/')
-
-        await expect(page.getByText('Poziom 1')).toBeVisible()
-        await expect(page.getByText('geralt')).toBeVisible()
-        await expect(page.getByText('Win Rate')).toBeVisible()
-        await expect(page.getByText('Dostępne')).toBeVisible()
+        await expect(page.getByText('Hasła nie są takie same.')).toBeVisible()
+        await expect(page).toHaveURL(/\/register/)
     })
 
-    test('pokazuje błąd logowania, gdy API zwraca 401', async ({ page }) => {
-        await mockLoginError(page, 'Nieprawidłowe dane logowania.')
+    test('pokazuje błąd gdy hasło jest za krótkie', async ({ page }) => {
+        await page.goto('/register')
 
-        await page.goto('/login')
+        const form = page.locator('form')
 
-        await page.getByLabel('Login').fill('geralt')
-        await page.getByLabel('Hasło').fill('zlehaslo')
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('ciri')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('123')
+        await form.getByRole('textbox', { name: 'Powtórz hasło', exact: true }).fill('123')
 
-        await page.getByRole('button', { name: 'Zaloguj się' }).click()
+        await form.getByRole('button', { name: 'Utwórz konto', exact: true }).click()
 
-        await expect(page).toHaveURL(/\/login/)
-        await expect(page.getByText('Nieprawidłowe dane logowania.')).toBeVisible()
+        await expect(page.getByText('Hasło powinno mieć minimum 6 znaków.')).toBeVisible()
     })
 
-    test('zalogowany użytkownik nie powinien wejść na /login', async ({ page }) => {
-        await page.goto('/')
+    test('użytkownik może założyć konto i zostaje przekierowany do logowania', async ({ page }) => {
+        await mockRegisterSuccess(page)
 
-        await page.evaluate(() => {
-            localStorage.setItem('gwint_token', 'seed-token')
-            localStorage.setItem('gwint_login', 'geralt')
-        })
+        await page.goto('/register')
 
-        await page.goto('/login')
+        const form = page.locator('form')
 
-        await expect(page).toHaveURL('/')
-        await expect(page.getByText('geralt')).toBeVisible()
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('yennefer')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('sekret123')
+        await form.getByRole('textbox', { name: 'Powtórz hasło', exact: true }).fill('sekret123')
+
+        await form.getByRole('button', { name: 'Utwórz konto', exact: true }).click()
+
+        await expect(page.getByText('Konto zostało utworzone. Za chwilę przejdziesz do logowania.')).toBeVisible()
+        await expect(page).toHaveURL(/\/login/, { timeout: 3000 })
+    })
+
+    test('pokazuje błąd z API przy rejestracji', async ({ page }) => {
+        await mockRegisterError(page, 'Taki użytkownik już istnieje.')
+
+        await page.goto('/register')
+
+        const form = page.locator('form')
+
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('yennefer')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('sekret123')
+        await form.getByRole('textbox', { name: 'Powtórz hasło', exact: true }).fill('sekret123')
+
+        await form.getByRole('button', { name: 'Utwórz konto', exact: true }).click()
+
+        await expect(page.getByText('Taki użytkownik już istnieje.')).toBeVisible()
+        await expect(page).toHaveURL(/\/register/)
+    })
+
+    test('pokazuje błąd gdy login jest pusty', async ({ page }) => {
+        await page.goto('/register')
+
+        const form = page.locator('form')
+
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('sekret123')
+        await form.getByRole('textbox', { name: 'Powtórz hasło', exact: true }).fill('sekret123')
+
+        await form.getByRole('button', { name: 'Utwórz konto', exact: true }).click()
+
+        await expect(page.getByText('Login jest wymagany.')).toBeVisible()
+    })
+
+    test('pokazuje błąd gdy hasło jest puste', async ({ page }) => {
+        await page.goto('/register')
+
+        const form = page.locator('form')
+
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('ciri')
+        await form.getByRole('button', { name: 'Utwórz konto', exact: true }).click()
+
+        await expect(page.getByText('Hasło jest wymagane.')).toBeVisible()
     })
 })

@@ -30,7 +30,10 @@
               >
                 <div class="card-glow" />
                 <v-icon icon="mdi-sword-cross" size="48" color="amber-darken-2" class="mb-4" />
-                <h2 class="gwint-title mb-2">Pokój: <span class="text-amber-darken-2">{{ signalRStore.roomId }}</span></h2>
+                <h2 class="gwint-title mb-2">
+                  Pokój:
+                  <span data-testid="room-code" class="text-amber-darken-2">{{ signalRStore.roomId }}</span>
+                </h2>
                 <p class="text-medium-emphasis mb-2">Udostępnij ten kod znajomemu</p>
 
                 <v-btn
@@ -65,13 +68,14 @@
                 </div>
 
                 <v-btn
-                  v-if="signalRStore.isRoomReady"
-                  color="amber-darken-2"
-                  size="x-large"
-                  class="gwint-btn mb-4"
-                  prepend-icon="mdi-play"
-                  :loading="isStarting"
-                  @click="startGame"
+                    data-testid="start-room-game-button"
+                    v-if="signalRStore.isRoomReady"
+                    color="amber-darken-2"
+                    size="x-large"
+                    class="gwint-btn mb-4"
+                    prepend-icon="mdi-play"
+                    :loading="isStarting"
+                    @click="startGame"
                 >
                   Zacznij grę!
                 </v-btn>
@@ -82,10 +86,11 @@
                 </div>
 
                 <v-btn
-                  variant="text"
-                  size="small"
-                  class="mt-4"
-                  @click="leaveRoom"
+                    data-testid="leave-room-button"
+                    variant="text"
+                    size="small"
+                    class="mt-4"
+                    @click="leaveRoom"
                 >
                   Opuść pokój
                 </v-btn>
@@ -105,7 +110,13 @@
                 <v-row>
                   <!-- Stwórz pokój -->
                   <v-col cols="12" sm="6">
-                    <v-card class="gwint-card action-card pa-6" rounded="xl" elevation="0" @click="handleCreate">
+                    <v-card
+                        data-testid="create-room-card"
+                        class="gwint-card action-card pa-6"
+                        rounded="xl"
+                        elevation="0"
+                        @click="handleCreate"
+                    >
                       <div class="card-glow" />
                       <div class="text-center">
                         <v-icon icon="mdi-plus-circle" size="48" color="amber-darken-2" class="mb-4" />
@@ -120,11 +131,12 @@
                   <!-- Dołącz do pokoju -->
                   <v-col cols="12" sm="6">
                     <v-card
-                      class="gwint-card action-card pa-6"
-                      rounded="xl"
-                      elevation="0"
-                      :class="{ 'action-card--open': phase === 'join' }"
-                      @click="phase = 'join'"
+                        data-testid="join-room-card"
+                        class="gwint-card action-card pa-6"
+                        rounded="xl"
+                        elevation="0"
+                        :class="{ 'action-card--open': phase === 'join' }"
+                        @click="phase = 'join'"
                     >
                       <div class="card-glow" />
                       <div class="text-center">
@@ -141,10 +153,11 @@
                 <!-- Formularz dołączania -->
                 <v-expand-transition>
                   <v-card
-                    v-if="phase === 'join'"
-                    class="gwint-card mt-4 pa-6"
-                    rounded="xl"
-                    elevation="0"
+                      data-testid="join-room-form"
+                      v-if="phase === 'join'"
+                      class="gwint-card mt-4 pa-6"
+                      rounded="xl"
+                      elevation="0"
                   >
                     <h3 class="mb-4">Wpisz kod pokoju</h3>
                     <v-text-field
@@ -158,14 +171,15 @@
                     />
                     <div class="d-flex ga-3">
                       <v-btn
-                        color="blue-lighten-2"
-                        :loading="isJoining"
-                        :disabled="joinCode.length < 6"
-                        @click="handleJoin"
+                          data-testid="join-submit-button"
+                          color="blue-lighten-2"
+                          :loading="isJoining"
+                          :disabled="joinCode.length < 6"
+                          @click="handleJoin"
                       >
                         Dołącz
                       </v-btn>
-                      <v-btn variant="text" @click="phase = 'menu'">Anuluj</v-btn>
+                      <v-btn data-testid="join-cancel-button" variant="text" @click="phase = 'menu'">Anuluj</v-btn>
                     </div>
                   </v-card>
                 </v-expand-transition>

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { mockLoginSuccess, mockLoginError } from './helpers/auth'
+import { mockLoginSuccess, mockLoginError, mockFetchMe } from './helpers/auth'
 
 test.describe('Login', () => {
     test('użytkownik może się zalogować', async ({ page }) => {
@@ -7,17 +7,17 @@ test.describe('Login', () => {
 
         await page.goto('/login')
 
-        await expect(page.getByRole('heading', { name: /Zaloguj się do GWINTA/i })).toBeVisible()
+        const form = page.locator('form')
 
-        await page.getByLabel('Login').fill('geralt')
-        await page.getByLabel('Hasło').fill('tajnehaslo')
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('geralt')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('tajnehaslo')
 
-        await page.getByRole('button', { name: 'Zaloguj się' }).click()
+        await form.getByRole('button', { name: 'Zaloguj się', exact: true }).click()
 
         await expect(page).toHaveURL('/')
 
-        await expect(page.getByText('Poziom 1')).toBeVisible()
         await expect(page.getByText('geralt')).toBeVisible()
+        await expect(page.locator('header').getByText('Poziom 1')).toBeVisible()
         await expect(page.getByText('Win Rate')).toBeVisible()
         await expect(page.getByText('Dostępne')).toBeVisible()
     })
@@ -27,10 +27,12 @@ test.describe('Login', () => {
 
         await page.goto('/login')
 
-        await page.getByLabel('Login').fill('geralt')
-        await page.getByLabel('Hasło').fill('zlehaslo')
+        const form = page.locator('form')
 
-        await page.getByRole('button', { name: 'Zaloguj się' }).click()
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('geralt')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('zlehaslo')
+
+        await form.getByRole('button', { name: 'Zaloguj się', exact: true }).click()
 
         await expect(page).toHaveURL(/\/login/)
         await expect(page.getByText('Nieprawidłowe dane logowania.')).toBeVisible()
@@ -48,5 +50,30 @@ test.describe('Login', () => {
 
         await expect(page).toHaveURL('/')
         await expect(page.getByText('geralt')).toBeVisible()
+    })
+
+    test('po logowaniu pobiera player id i zapisuje je w localStorage', async ({ page }) => {
+        await mockLoginSuccess(page)
+        await mockFetchMe(page, 777, 'geralt')
+
+        await page.goto('/login')
+
+        const form = page.locator('form')
+
+        await form.getByRole('textbox', { name: 'Login', exact: true }).fill('geralt')
+        await form.getByRole('textbox', { name: 'Hasło', exact: true }).fill('tajnehaslo')
+        await form.getByRole('button', { name: 'Zaloguj się', exact: true }).click()
+
+        await expect(page).toHaveURL('/')
+
+        const storage = await page.evaluate(() => ({
+            token: localStorage.getItem('gwint_token'),
+            login: localStorage.getItem('gwint_login'),
+            playerId: localStorage.getItem('gwint_player_id'),
+        }))
+
+        expect(storage.token).toBe('fake-jwt-token')
+        expect(storage.login).toBe('geralt')
+        expect(storage.playerId).toBe('777')
     })
 })

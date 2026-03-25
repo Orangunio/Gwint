@@ -12,11 +12,13 @@ test.describe('Logout', () => {
         await page.reload()
 
         await expect(page.getByText('vesemir')).toBeVisible()
-        await expect(page.getByText('Poziom 1')).toBeVisible()
+        await expect(page.locator('header').getByText('Poziom 1')).toBeVisible()
 
-        const accountButton = page.locator('button').filter({ has: page.locator('.mdi-account-circle') }).first()
+        const accountButton = page.locator('button').filter({
+            has: page.locator('.mdi-account-circle'),
+        }).first()
+
         await accountButton.click()
-
         await page.getByText('Wyloguj').click()
 
         await expect(page).toHaveURL('/')
@@ -25,5 +27,15 @@ test.describe('Logout', () => {
 
         const token = await page.evaluate(() => localStorage.getItem('gwint_token'))
         expect(token).toBeNull()
+
+        const storage = await page.evaluate(() => ({
+            token: localStorage.getItem('gwint_token'),
+            login: localStorage.getItem('gwint_login'),
+            playerId: localStorage.getItem('gwint_player_id'),
+        }))
+
+        expect(storage.token).toBeNull()
+        expect(storage.login).toBeNull()
+        expect(storage.playerId).toBeNull()
     })
 })

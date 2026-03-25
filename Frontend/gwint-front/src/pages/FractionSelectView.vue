@@ -11,7 +11,7 @@
               Wybierz <span class="title-glow">Frakcję</span>
             </h1>
             <p class="text-medium-emphasis">
-              Pokój: <strong class="text-amber-darken-2">{{ roomId }}</strong>
+              Pokój: <strong data-testid="fraction-room-id" class="text-amber-darken-2">{{ roomId }}</strong>
             </p>
           </div>
 
@@ -24,14 +24,15 @@
               md="3"
             >
               <v-card
-                class="fraction-card pa-5 text-center"
-                :class="{
+                  :data-testid="`fraction-card-${fraction.id}`"
+                  class="fraction-card pa-5 text-center"
+                  :class="{
                   'fraction-card--selected': selectedFraction === fraction.id,
                   'fraction-card--confirmed': isConfirmed,
-                }"
-                rounded="xl"
-                elevation="0"
-                @click="!isConfirmed && selectFraction(fraction.id)"
+                  }"
+                  rounded="xl"
+                  elevation="0"
+                  @click="!isConfirmed && selectFraction(fraction.id)"
               >
                 <div class="fraction-glow" :style="{ '--glow': fraction.color }" />
                 <v-icon
@@ -58,19 +59,20 @@
           <div class="mt-8 text-center">
             <template v-if="!isConfirmed">
               <v-btn
-                color="amber-darken-2"
-                size="x-large"
-                class="confirm-btn"
-                :disabled="!selectedFraction"
-                prepend-icon="mdi-check"
-                @click="confirmFraction"
+                  data-testid="confirm-fraction-button"
+                  color="amber-darken-2"
+                  size="x-large"
+                  class="confirm-btn"
+                  :disabled="!selectedFraction"
+                  prepend-icon="mdi-check"
+                  @click="confirmFraction"
               >
                 Potwierdź wybór
               </v-btn>
             </template>
 
             <template v-else-if="!bothConfirmed">
-              <div class="d-flex align-center justify-center ga-3">
+              <div data-testid="fraction-waiting-status" class="d-flex align-center justify-center ga-3">
                 <v-progress-circular size="24" width="2" indeterminate color="amber-darken-2" />
                 <span class="text-medium-emphasis">Oczekiwanie na wybór przeciwnika...</span>
               </div>
