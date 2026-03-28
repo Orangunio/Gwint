@@ -1,5 +1,6 @@
 ﻿using Backend.Models;
 using Backend.Models.Enums;
+using System.ComponentModel;
 
 namespace Backend.UseCases
 {
@@ -426,6 +427,202 @@ namespace Backend.UseCases
             game.Board.RainActive = false;
 
             game.Board.CalculateRowScores();
+        }
+        #endregion
+
+        #region Dowodcy
+
+        //Nilfgard
+        public List<Card> EmperorOfNilfgardAbility(List<Card> enemyHand)
+        {
+            Random rnd = new Random();
+
+            int count = Math.Min(3, enemyHand.Count);
+
+            return enemyHand
+                .OrderBy(x => rnd.Next())
+                .Take(count)
+                .ToList();
+        }
+
+        public void HisEmperialmajestyAbility(Game game)
+        {
+            game.Board.RainActive = true;
+            game.Board.CalculateRowScores();
+        }
+
+        public void InvaiderOfTheNorthAbility(Game game, Card card)
+        {
+            Random rnd = new Random();
+
+            int row = rnd.Next(0, 3);
+
+            Place place;
+
+            if(row == 0)
+            {
+                place = Place.FirstRow;
+            }
+            if (row == 1)
+            {
+                place = Place.SecondRow;
+            }
+            else
+            {
+                place = Place.ThirdRow;
+            }
+
+            AddCardToBoard(game, game.CurrentPlayer ,place, card);
+        }
+
+        public void TheRelentlessAbility(Game game, Card card)
+        {
+            if(game.CurrentPlayer == game.Player1) 
+            { 
+                game.Player1CardsOnHand.Add(card);
+            }
+            else
+            {
+                game.Player2CardsOnHand.Add(card);
+            }
+        }
+
+        public void TheWhiteFlameAbility(Game game)
+        {
+            game.Player1CommanderCard = null;
+            game.Player2CommanderCard = null;
+        }
+
+
+        // Polnoc
+        public void KingOfTemeriaAbility(Game game)
+        {
+            if(game.CurrentPlayer == game.Player1)
+            {
+                var fogCard = game.Player1CardInDeck.FirstOrDefault(c => c.ability == Abilities.gestaMgla);
+                if(fogCard != null)
+                {
+                    game.Board.FogActive = true;
+                }
+                game.Player1CardInDeck.Remove(fogCard);
+            }
+            else
+            {
+                var fogCard = game.Player2CardInDeck.FirstOrDefault(c => c.ability == Abilities.gestaMgla);
+                if (fogCard != null)
+                {
+                    game.Board.FogActive = true;
+                }
+                game.Player2CardInDeck.Remove(fogCard);
+            }
+        }
+
+        public void CommanderOfTheNorthAbility(Game game)
+        {
+            game.Board.FrostActive = false;
+            game.Board.FogActive = false;
+            game.Board.RainActive = false;
+            game.Board.CalculateRowScores();
+        }
+
+        public void SonOfMedellAbility(Game game)
+        {
+            int rowStrength = 0;
+            if(game.CurrentPlayer == game.Player1)
+            {
+                foreach(var c in game.Board.Player2SecondCardRow)
+                {
+                    rowStrength += c.finalStrength;
+                }
+                if (rowStrength < 10)
+                {
+                    return;
+                }
+                int maxStrength = game.Board.Player2SecondCardRow.Max(x => x.finalStrength);
+
+                List<Card> cardsToDestroy = game.Board.Player2SecondCardRow.Where(x => x.finalStrength == maxStrength).ToList();
+
+                foreach (var c in cardsToDestroy)
+                {
+                    game.Board.Player2SecondCardRow.Remove(c);
+                }
+            }
+            else
+            {
+                foreach (var c in game.Board.Player1SecondCardRow)
+                {
+                    rowStrength += c.finalStrength;
+                }
+                if (rowStrength < 10)
+                {
+                    return;
+                }
+                int maxStrength = game.Board.Player1SecondCardRow.Max(x => x.finalStrength);
+
+                List<Card> cardsToDestroy = game.Board.Player1SecondCardRow.Where(x => x.finalStrength == maxStrength).ToList();
+
+                foreach (var c in cardsToDestroy)
+                {
+                    game.Board.Player1SecondCardRow.Remove(c);
+                }
+            }
+        }
+
+        public void TheSiegemasterAbility(Game game)
+        {
+            if(game.CurrentPlayer == game.Player1)
+            {
+                game.Board.RogDowodcyActive[0, 2] = true;
+                game.Board.CalculateRowScores();
+            }
+            else
+            {
+                game.Board.RogDowodcyActive[1, 2] = true;
+                game.Board.CalculateRowScores();
+            }
+        }
+
+        public void TheSteelForged(Game game)
+        {
+            int rowStrength = 0;
+            if (game.CurrentPlayer == game.Player1)
+            {
+                foreach (var c in game.Board.Player2ThirdCardRow)
+                {
+                    rowStrength += c.finalStrength;
+                }
+                if (rowStrength < 10)
+                {
+                    return;
+                }
+                int maxStrength = game.Board.Player2ThirdCardRow.Max(x => x.finalStrength);
+
+                List<Card> cardsToDestroy = game.Board.Player2ThirdCardRow.Where(x => x.finalStrength == maxStrength).ToList();
+
+                foreach (var c in cardsToDestroy)
+                {
+                    game.Board.Player2ThirdCardRow.Remove(c);
+                }
+            }
+            else
+            {
+                foreach (var c in game.Board.Player1ThirdCardRow)
+                {
+                    rowStrength += c.finalStrength;
+                }
+                if (rowStrength < 10)
+                {
+                    return;
+                }
+                int maxStrength = game.Board.Player1ThirdCardRow.Max(x => x.finalStrength);
+
+                List<Card> cardsToDestroy = game.Board.Player1ThirdCardRow.Where(x => x.finalStrength == maxStrength).ToList();
+
+                foreach (var c in cardsToDestroy)
+                {
+                    game.Board.Player1ThirdCardRow.Remove(c);
+                }
+            }
         }
         #endregion
     }
