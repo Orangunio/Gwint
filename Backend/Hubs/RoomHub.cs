@@ -113,5 +113,12 @@ namespace Backend.Hubs
                 await Clients.Group(roomId).SendAsync("GameSetup", playerLogins);
             }
         }
+        public async Task BroadcastFraction(string roomId, int fraction)
+        {
+            if (rooms.TryGetValue(roomId, out var room))
+            {
+                await Clients.OthersInGroup(roomId).SendAsync("FractionSelected", fraction);
+            }
+        }
     }
 }
