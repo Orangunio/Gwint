@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import * as signalR from '@microsoft/signalr'
 import { usePlayerStore } from './player'
+import router from '@/router'
 
 const HUB_URL = 'http://localhost:5006'
 
@@ -24,11 +25,11 @@ export interface GameBoard {
   player2FirstCardRow: GameCard[]
   player2SecondCardRow: GameCard[]
   player2ThirdCardRow: GameCard[]
-  rowScores: number[][]
+  rowScores: number[][];
+  rogDowodcyActive: boolean[][];
   frostActive: boolean
   fogActive: boolean
   rainActive: boolean
-  rogDowodcyActive: boolean[][]
 }
 
 export interface GamePlayer {
@@ -201,13 +202,16 @@ export const useSignalRStore = defineStore('signalr', {
       })
 
       // RoomHub GameStarted wysyła tylko roomId (string), nie obiekt gry
-      conn.on('GameStarted', (game: GameState) => {
-      console.log('=== GameStarted otrzymany ===')
-      console.log('game:', JSON.stringify(game, null, 2))
-      console.log('gameConnectionId:', this.gameConnectionId)
-      this.game = game
-      this.myTurn = false
-      })
+      // conn.on('GameStarted', (game: GameState) => {
+      // console.log('✅ GameStarted otrzymany z GameHub!', game)
+      // console.log('Moje connectionId:', this.gameConnectionId)
+      // console.log('Player1 ID:', game.player1?.connectionId)
+      // console.log('Player2 ID:', game.player2?.connectionId)
+      // this.game = game
+      // this.myTurn = false
+      // this.pendingAction = null
+      // this.pendingCardId = null
+      // })
     },
 
     async createRoom(playerName: string): Promise<string> {
@@ -248,55 +252,66 @@ export const useSignalRStore = defineStore('signalr', {
       try {
         await conn.start()
         this.gameConnection = conn
-        // NAPRAWKA: zapisujemy connectionId z GameHub osobno
         this.gameConnectionId = conn.connectionId
-        console.log('GameHub connectionId:', this.gameConnectionId)
+        console.log('✅ GameHub połączony. ConnectionId:', this.gameConnectionId)
+
+        // <<< NAJWAŻNIEJSZA POPRAWKA >>>
+        if (this.roomId) {
+          console.log(`Dołączam do grupy GameHub: ${this.roomId}`)
+          await conn.invoke('JoinGameRoom', this.roomId)
+        }
+
       } catch (e) {
         this.error = 'Nie można połączyć z GameHub.'
+        console.error('Błąd connectToGame:', e)
         throw e
       }
     },
 
     setupGameListeners(conn: signalR.HubConnection) {
-      // NAPRAWKA: GameStarted na GameHub zwraca pełny obiekt GameState
       conn.on('GameStarted', (game: GameState) => {
-        console.log('GameHub GameStarted, dane gry:', game)
-        console.log('Moje gameConnectionId:', this.gameConnectionId)
-        console.log('Player1 connectionId:', game.player1?.connectionId)
-        console.log('Player2 connectionId:', game.player2?.connectionId)
-        this.game = game
-        this.myTurn = false
-      })
+        console.log('✅ [GameHub] GameStarted otrzymany!');
+        console.log('Moje gameConnectionId:', this.gameConnectionId);
+        console.log('Player1 connectionId:', game.player1?.connectionId);
+        console.log('Player2 connectionId:', game.player2?.connectionId);
+
+        this.game = game;
+        this.myTurn = false;
+        this.pendingAction = null;
+        this.pendingCardId = null;
+
+        console.log('Gra załadowana pomyślnie. Oczekuję na przejście do widoku gry...');
+      });
 
       conn.on('TurnStarted', (connectionId: string) => {
-        this.myTurn = connectionId === this.gameConnectionId
-        this.pendingAction = null
-        this.pendingCardId = null
-      })
+        this.myTurn = connectionId === this.gameConnectionId;
+        this.pendingAction = null;
+        this.pendingCardId = null;
+      });
 
       conn.on('NextTurn', (connectionId: string) => {
-        this.myTurn = connectionId === this.gameConnectionId
-        this.pendingAction = null
-        this.pendingCardId = null
-      })
+        this.myTurn = connectionId === this.gameConnectionId;
+        this.pendingAction = null;
+        this.pendingCardId = null;
+      });
 
       conn.on('ScoiataelChooseFirstPlayer', () => {
-        this.pendingAction = 'agility'
-      })
+        this.pendingAction = 'agility';
+      });
 
       conn.on('RequestAgilityRow', (cardId: number) => {
-        this.pendingAction = 'agility'
-        this.pendingCardId = cardId
-      })
+        this.pendingAction = 'agility';
+        this.pendingCardId = cardId;
+      });
 
       conn.on('RequestResurrectionTarget', () => {
-        this.pendingAction = 'resurrection'
-      })
+        this.pendingAction = 'resurrection';
+      });
 
       conn.on('SelectCardToDecoy', (cardId: number) => {
-        this.pendingAction = 'decoy'
-        this.pendingCardId = cardId
-      })
+        this.pendingAction = 'decoy';
+        this.pendingCardId = cardId;
+      });
     },
 
     async startGame(fraction1: number, fraction2: number) {

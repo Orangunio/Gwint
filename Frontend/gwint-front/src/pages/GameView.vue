@@ -308,16 +308,26 @@ const opponentRows = computed(() => {
 
 const myRowScores = computed(() => {
   const scores = board.value?.rowScores
-  if (!scores) return [0, 0, 0]
+  if (!scores || scores.length === 0) return [0, 0, 0]
+  
   const p = amIP1.value ? 0 : 1
-  return [scores[p]?.[0] ?? 0, scores[p]?.[1] ?? 0, scores[p]?.[2] ?? 0]
+  return [
+    scores[p]?.[0] ?? 0,
+    scores[p]?.[1] ?? 0,
+    scores[p]?.[2] ?? 0
+  ]
 })
 
 const opponentRowScores = computed(() => {
   const scores = board.value?.rowScores
-  if (!scores) return [0, 0, 0]
+  if (!scores || scores.length === 0) return [0, 0, 0]
+  
   const p = amIP1.value ? 1 : 0
-  return [scores[p]?.[0] ?? 0, scores[p]?.[1] ?? 0, scores[p]?.[2] ?? 0]
+  return [
+    scores[p]?.[0] ?? 0,
+    scores[p]?.[1] ?? 0,
+    scores[p]?.[2] ?? 0
+  ]
 })
 
 const myTotal = computed(() => myRowScores.value.reduce((a, b) => a + b, 0))
