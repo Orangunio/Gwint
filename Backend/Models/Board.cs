@@ -16,8 +16,18 @@ namespace Backend.Models
 
         [NotMapped]
         //Wiersz 0 dla gracza 1, wiersz 1 dla gracza 2
-        public int[,] RowScores { get; set; }
-        public bool[,] RogDowodcyActive { get; set; }
+        public int[][] RowScores { get; set; } = new int[2][]
+        {
+            new int[3],
+            new int[3]
+        };
+
+        [NotMapped]
+        public bool[][] RogDowodcyActive { get; set; } = new bool[2][]
+        {
+            new bool[3],
+            new bool[3]
+        };
 
         //Obecna pogoda na planszy, która wpływa na siłę kart
         public bool FrostActive { get; set; }
@@ -32,38 +42,34 @@ namespace Backend.Models
             Player2FirstCardRow = new List<Card>();
             Player2SecondCardRow = new List<Card>();
             Player2ThirdCardRow = new List<Card>();
-            RowScores = new int[2, 3];
             FrostActive = false;
             FogActive = false;
             RainActive = false;
 
-            RogDowodcyActive = new bool[2, 3];
+            RogDowodcyActive = new bool[2][]
+            {
+                new bool[3],
+                new bool[3]
+            };
 
             for (int i = 0; i < 2; i++)
             {
                 for (int j = 0; j < 3; j++)
                 {
-                    RogDowodcyActive[i, j] = false;
+                    RogDowodcyActive[i][j] = false;
                 }
             }
         }
 
         public void CalculateRowScores()
         {
-            // Obliczanie siły kart na każdej linii dla obu graczy
-            foreach (var card in Player1FirstCardRow)
-                RowScores[0, 0] += card.finalStrength;
-            foreach (var card in Player1SecondCardRow)
-                RowScores[0, 1] += card.finalStrength;
-            foreach (var card in Player1ThirdCardRow)
-                RowScores[0, 2] += card.finalStrength;
+            RowScores[0][0] = Player1FirstCardRow.Sum(c => c.finalStrength);   // Player1 Rząd 1
+            RowScores[0][1] = Player1SecondCardRow.Sum(c => c.finalStrength);
+            RowScores[0][2] = Player1ThirdCardRow.Sum(c => c.finalStrength);
 
-            foreach (var card in Player2FirstCardRow)
-                RowScores[1, 0] += card.finalStrength;
-            foreach (var card in Player2SecondCardRow)
-                RowScores[1, 1] += card.finalStrength;
-            foreach (var card in Player2ThirdCardRow)
-                RowScores[1, 2] += card.finalStrength;
+            RowScores[1][0] = Player2FirstCardRow.Sum(c => c.finalStrength);   // Player2 Rząd 1
+            RowScores[1][1] = Player2SecondCardRow.Sum(c => c.finalStrength);
+            RowScores[1][2] = Player2ThirdCardRow.Sum(c => c.finalStrength);
         }
 
         public int GetPlayerTotalScore(bool currentPlayerIs1)

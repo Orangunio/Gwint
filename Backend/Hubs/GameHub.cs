@@ -28,65 +28,71 @@ namespace Backend.Hubs
 
         public async Task StartGame(string roomId, Fractions player1SelectedFraction, Fractions player2SelectedFraction)
         {
-            if (RoomHub.rooms.TryGetValue(roomId, out var room) && room.Players.Count == 2)
+            if (!RoomHub.rooms.TryGetValue(roomId, out var room) || room?.Players?.Count != 2)
             {
-                var player1Id = room.Players[0].Id;
-                var player2Id = room.Players[1].Id;
-
-                // Pobieramy talie z OrderBy, żeby uniknąć ostrzeżeń EF Core
-                var player1Deck = await gwintDBContext.PlayerDecks
-                    .Where(pd => pd.PlayerId == player1Id)
-                    .Include(pd => pd.Card)
-                    .Where(pd => pd.Card.fraction == player1SelectedFraction)
-                    .OrderBy(pd => pd.CardId) 
-                    .Select(pd => pd.Card)
-                    .Take(25) // Zwiększ do 25, żeby mieć zapas na dowódcę + 10 do ręki + resztę w talii
-                    .ToListAsync();
-
-                var player2Deck = await gwintDBContext.PlayerDecks
-                    .Where(pd => pd.PlayerId == player2Id)
-                    .Include(pd => pd.Card)
-                    .Where(pd => pd.Card.fraction == player2SelectedFraction)
-                    .OrderBy(pd => pd.CardId)
-                    .Select(pd => pd.Card)
-                    .Take(25)
-                    .ToListAsync();
-
-                var game = new Game(player1Deck, player2Deck, player1SelectedFraction, player2SelectedFraction);
-                game.Player1 = room.Players[0];
-                game.Player2 = room.Players[1];
-                game.RoomId = roomId;
-
-                // BEZPIECZNE PRZYPISANIE DOWÓDCÓW
-                game.Player1CommanderCard = player1Deck.FirstOrDefault(c => c.isCommander);
-                game.Player2CommanderCard = player2Deck.FirstOrDefault(c => c.isCommander);
-
-                // Usuwamy tylko jeśli znaleziono dowódcę
-                if (game.Player1CommanderCard != null) player1Deck.Remove(game.Player1CommanderCard);
-                if (game.Player2CommanderCard != null) player2Deck.Remove(game.Player2CommanderCard);
-
-                // Przypisuje karty do talii (Upewnij się, że Shuffle zwraca List<Card>)
-                game.Player1CardInDeck = GameUseCases.Shuffle(player1Deck);
-                game.Player2CardInDeck = GameUseCases.Shuffle(player2Deck);
-
-                // Rozdanie kart (Take(10) jest bezpieczne nawet jeśli jest mniej kart)
-                game.Player1CardsOnHand = game.Player1CardInDeck.Take(10).ToList();
-                game.Player2CardsOnHand = game.Player2CardInDeck.Take(10).ToList();
-                
-                game.Player1CardInDeck = game.Player1CardInDeck.Skip(10).ToList();
-                game.Player2CardInDeck = game.Player2CardInDeck.Skip(10).ToList();
-
-                // INICJALIZACJA PLANSZY (Jeśli Board w modelu Game jest nullem, frontend się nie wyświetli)
-                if (game.Board == null) game.Board = new Board();
-
-                gameUseCases.games.TryAdd(roomId, game);
-
-                // Wysyłamy informację o starcie
-                await Clients.Group(roomId).SendAsync("GameStarted", game);
-                
-                // Opcjonalnie: Od razu powiedz czyja tura (zazwyczaj gracza 1)
-                await Clients.Group(roomId).SendAsync("TurnStarted", game.Player1.ConnectionId);
+                Console.WriteLine($"[GameHub] Błąd: Pokój {roomId} nie istnieje lub nie ma 2 graczy.");
+                await Clients.Caller.SendAsync("Error", "Nieprawidłowy pokój lub brak drugiego gracza.");
+                return;
             }
+
+            Console.WriteLine($"[GameHub] StartGame rozpoczęty dla pokoju {roomId}");
+
+            // Zapewniamy, że obaj gracze są w grupie GameHub
+            await JoinGameRoom(roomId);
+
+            var player1Id = room.Players[0].Id;
+            var player2Id = room.Players[1].Id;
+
+            // Pobieranie decków
+            var player1Deck = await gwintDBContext.PlayerDecks
+                .Where(pd => pd.PlayerId == player1Id)
+                .Include(pd => pd.Card)
+                .Where(pd => pd.Card.fraction == player1SelectedFraction)
+                .OrderBy(pd => pd.CardId)
+                .Select(pd => pd.Card)
+                .Take(25)
+                .ToListAsync();
+
+            var player2Deck = await gwintDBContext.PlayerDecks
+                .Where(pd => pd.PlayerId == player2Id)
+                .Include(pd => pd.Card)
+                .Where(pd => pd.Card.fraction == player2SelectedFraction)
+                .OrderBy(pd => pd.CardId)
+                .Select(pd => pd.Card)
+                .Take(25)
+                .ToListAsync();
+
+            var game = new Game(player1Deck, player2Deck, player1SelectedFraction, player2SelectedFraction);
+
+            game.Player1 = room.Players[0];
+            game.Player2 = room.Players[1];
+            game.RoomId = roomId;
+
+            game.Player1CommanderCard = player1Deck.FirstOrDefault(c => c.isCommander);
+            game.Player2CommanderCard = player2Deck.FirstOrDefault(c => c.isCommander);
+
+            if (game.Player1CommanderCard != null) player1Deck.Remove(game.Player1CommanderCard);
+            if (game.Player2CommanderCard != null) player2Deck.Remove(game.Player2CommanderCard);
+
+            game.Player1CardInDeck = GameUseCases.Shuffle(player1Deck);
+            game.Player2CardInDeck = GameUseCases.Shuffle(player2Deck);
+
+            game.Player1CardsOnHand = game.Player1CardInDeck.Take(10).ToList();
+            game.Player2CardsOnHand = game.Player2CardInDeck.Take(10).ToList();
+
+            game.Player1CardInDeck = game.Player1CardInDeck.Skip(10).ToList();
+            game.Player2CardInDeck = game.Player2CardInDeck.Skip(10).ToList();
+
+            if (game.Board == null) game.Board = new Board();
+
+            gameUseCases.games.TryAdd(roomId, game);
+
+            Console.WriteLine($"[GameHub] Gra utworzona. Wysyłam GameStarted do grupy {roomId}");
+
+            await Clients.Group(roomId).SendAsync("GameStarted", game);
+            await Clients.Group(roomId).SendAsync("TurnStarted", game.Player1.ConnectionId);
+
+            Console.WriteLine($"[GameHub] GameStarted wysłany | Player1: {game.Player1.ConnectionId} | Player2: {game.Player2.ConnectionId}");
         }
 
         public async Task SetFirstPlayer(string roomId, string chosenConnectionId)

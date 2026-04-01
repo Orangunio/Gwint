@@ -238,19 +238,19 @@ namespace Backend.UseCases
                 {
                     enemyRow = game.Board.Player2FirstCardRow;
                     weatherEffect = game.Board.FrostActive;
-                    hornEffect = game.Board.RogDowodcyActive[1, 0];
+                    hornEffect = game.Board.RogDowodcyActive[1][0];
                 }
                 else if (playedCard.place == Place.SecondRow)
                 {
                     enemyRow = game.Board.Player2SecondCardRow;
                     weatherEffect = game.Board.FogActive;
-                    hornEffect = game.Board.RogDowodcyActive[1, 1];
+                    hornEffect = game.Board.RogDowodcyActive[1][1];
                 }
                 else if (playedCard.place == Place.ThirdRow)
                 {
                     enemyRow = game.Board.Player2ThirdCardRow;
                     weatherEffect = game.Board.FogActive;
-                    hornEffect = game.Board.RogDowodcyActive[1, 2];
+                    hornEffect = game.Board.RogDowodcyActive[1][2];
                 }
             }
             else
@@ -261,19 +261,19 @@ namespace Backend.UseCases
                 {
                     enemyRow = game.Board.Player1FirstCardRow;
                     weatherEffect = game.Board.FrostActive;
-                    hornEffect = game.Board.RogDowodcyActive[0, 0];
+                    hornEffect = game.Board.RogDowodcyActive[0][0];
                 }
                 else if (playedCard.place == Place.SecondRow)
                 {
                     enemyRow = game.Board.Player1SecondCardRow;
                     weatherEffect = game.Board.FogActive;
-                    hornEffect = game.Board.RogDowodcyActive[0, 1];
+                    hornEffect = game.Board.RogDowodcyActive[0][1];
                 }
                 else if (playedCard.place == Place.ThirdRow)
                 {
                     enemyRow = game.Board.Player1ThirdCardRow;
                     weatherEffect = game.Board.FogActive;
-                    hornEffect = game.Board.RogDowodcyActive[0, 2];
+                    hornEffect = game.Board.RogDowodcyActive[0][2];
                 }
             }
 
@@ -572,12 +572,12 @@ namespace Backend.UseCases
         {
             if(game.CurrentPlayer == game.Player1)
             {
-                game.Board.RogDowodcyActive[0, 2] = true;
+                game.Board.RogDowodcyActive[0][2] = true;
                 game.Board.CalculateRowScores();
             }
             else
             {
-                game.Board.RogDowodcyActive[1, 2] = true;
+                game.Board.RogDowodcyActive[1][2] = true;
                 game.Board.CalculateRowScores();
             }
         }
