@@ -24,26 +24,20 @@
               md="3"
             >
               <v-card
-                  :data-testid="`fraction-card-${fraction.id}`"
-                  class="fraction-card pa-5 text-center"
-                  :class="{
+                :data-testid="`fraction-card-${fraction.id}`"
+                class="fraction-card pa-5 text-center"
+                :class="{
                   'fraction-card--selected': selectedFraction === fraction.id,
                   'fraction-card--confirmed': isConfirmed,
-                  }"
-                  rounded="xl"
-                  elevation="0"
-                  @click="!isConfirmed && selectFraction(fraction.id)"
+                }"
+                rounded="xl"
+                elevation="0"
+                @click="!isConfirmed && selectFraction(fraction.id)"
               >
                 <div class="fraction-glow" :style="{ '--glow': fraction.color }" />
-                <v-icon
-                  :icon="fraction.icon"
-                  size="48"
-                  :color="fraction.color"
-                  class="mb-3"
-                />
+                <v-icon :icon="fraction.icon" size="48" :color="fraction.color" class="mb-3" />
                 <h3 class="fraction-name mb-1">{{ fraction.name }}</h3>
                 <p class="text-caption text-medium-emphasis">{{ fraction.description }}</p>
-
                 <v-chip
                   v-if="selectedFraction === fraction.id"
                   color="amber-darken-2"
@@ -59,13 +53,13 @@
           <div class="mt-8 text-center">
             <template v-if="!isConfirmed">
               <v-btn
-                  data-testid="confirm-fraction-button"
-                  color="amber-darken-2"
-                  size="x-large"
-                  class="confirm-btn"
-                  :disabled="!selectedFraction"
-                  prepend-icon="mdi-check"
-                  @click="confirmFraction"
+                data-testid="confirm-fraction-button"
+                color="amber-darken-2"
+                size="x-large"
+                class="confirm-btn"
+                :disabled="selectedFraction === null"
+                prepend-icon="mdi-check"
+                @click="confirmFraction"
               >
                 Potwierdź wybór
               </v-btn>
@@ -85,13 +79,7 @@
             </template>
           </div>
 
-          <v-alert
-            v-if="error"
-            class="mt-4"
-            type="error"
-            variant="tonal"
-            density="comfortable"
-          >
+          <v-alert v-if="error" class="mt-4" type="error" variant="tonal" density="comfortable">
             {{ error }}
           </v-alert>
 
@@ -111,40 +99,41 @@ const router = useRouter()
 const signalRStore = useSignalRStore()
 
 const roomId = route.params.roomId as string
+
 const selectedFraction = ref<number | null>(null)
 const isConfirmed = ref(false)
-const opponentConfirmed = ref(false)
-// NAPRAWKA: zwykły ref zamiast computed (bo zapisywaliśmy do computed = błąd)
 const bothConfirmed = ref(false)
 const error = ref<string | null>(null)
 
-const fractions = [
-  { id: 1, name: 'Nilfgaard', icon: 'mdi-sun', color: 'amber-darken-2', description: 'Imperium południa. Szpiedzy i kontrola.' },
-  { id: 2, name: 'Królestwa Północy', icon: 'mdi-shield', color: 'blue-lighten-2', description: 'Waleczna piechota i oblężenie.' },
-  { id: 3, name: "Scoia'tael", icon: 'mdi-leaf', color: 'green-lighten-2', description: 'Elfy i krasnoludy. Zwinność i zasadzki.' },
-  { id: 4, name: 'Potwory', icon: 'mdi-skull', color: 'red-lighten-2', description: 'Hordy stworów. Siła w liczbach.' },
-]
-
+// Lokalne zmienne (nie reaktywne) – nie potrzebują ref
 let myFraction: number | null = null
 let opponentFraction: number | null = null
-// NAPRAWKA: flaga żeby tylko jeden gracz wysłał StartGame
 let gameStartInitiated = false
+
+const fractions = [
+  { id: 1, name: 'Nilfgaard',         icon: 'mdi-sun',    color: 'amber-darken-2',  description: 'Imperium południa. Szpiedzy i kontrola.' },
+  { id: 2, name: 'Królestwa Północy', icon: 'mdi-shield', color: 'blue-lighten-2',  description: 'Waleczna piechota i oblężenie.' },
+  { id: 3, name: "Scoia'tael",        icon: 'mdi-leaf',   color: 'green-lighten-2', description: 'Elfy i krasnoludy. Zwinność i zasadzki.' },
+  { id: 4, name: 'Potwory',           icon: 'mdi-skull',  color: 'red-lighten-2',   description: 'Hordy stworów. Siła w liczbach.' },
+]
+
+// Handler odbierający frakcję przeciwnika przez RoomHub (BroadcastFraction → FractionSelected)
+function onFractionSelected(fraction: number) {
+  opponentFraction = fraction
+  checkBothReady()
+}
 
 onMounted(() => {
   if (!signalRStore.isConnected) {
     router.push({ name: 'lobby' })
     return
   }
-
-  signalRStore.roomConnection?.on('FractionSelected', (fraction: number) => {
-    opponentFraction = fraction
-    opponentConfirmed.value = true
-    checkBothReady()
-  })
+  // Nasłuchujemy na RoomHub (to tam idzie BroadcastFraction)
+  signalRStore.roomConnection?.on('FractionSelected', onFractionSelected)
 })
 
 onUnmounted(() => {
-  signalRStore.roomConnection?.off('FractionSelected')
+  signalRStore.roomConnection?.off('FractionSelected', onFractionSelected)
 })
 
 function selectFraction(id: number) {
@@ -152,30 +141,30 @@ function selectFraction(id: number) {
 }
 
 async function confirmFraction() {
-  if (!selectedFraction.value) return
+  if (selectedFraction.value === null) return
+
   myFraction = selectedFraction.value
   isConfirmed.value = true
 
-  await signalRStore.roomConnection?.invoke('BroadcastFraction', roomId, selectedFraction.value)
+  // Wysyłamy swój wybór do przeciwnika przez RoomHub
+  await signalRStore.roomConnection?.invoke('BroadcastFraction', roomId, myFraction)
 
   checkBothReady()
 }
 
 async function checkBothReady() {
-  if (!myFraction || !opponentFraction) return
+  if (myFraction === null || opponentFraction === null) return
   if (gameStartInitiated) return
 
+  gameStartInitiated = true
   bothConfirmed.value = true
 
-  // NAPRAWKA: tylko host (gracz który stworzył pokój, czyli ma roomId w store) startuje grę
-  const amIHost = signalRStore.amIHost
-
   try {
+    // Obaj gracze łączą się z GameHub
     await signalRStore.connectToGame()
 
-    if (amIHost) {
-      // NAPRAWKA: ustawiamy flagę PRZED invoke żeby drugi gracz nie zdążył też wysłać
-      gameStartInitiated = true
+    // Tylko host wywołuje StartGame na GameHub
+    if (signalRStore.amIHost) {
       await signalRStore.startGame(myFraction, opponentFraction)
     }
 
@@ -183,6 +172,7 @@ async function checkBothReady() {
   } catch (e) {
     error.value = 'Nie można rozpocząć gry.'
     gameStartInitiated = false
+    bothConfirmed.value = false
   }
 }
 </script>
@@ -233,9 +223,9 @@ async function checkBothReady() {
   overflow: hidden;
 }
 
-.fraction-card:hover { transform: translateY(-6px); border-color: rgba(255, 215, 64, 0.2) !important; }
-.fraction-card--selected { border-color: rgba(255, 215, 64, 0.5) !important; background: rgba(255, 215, 64, 0.06) !important; transform: translateY(-4px); }
-.fraction-card--confirmed { cursor: default; opacity: 0.7; }
+.fraction-card:hover            { transform: translateY(-6px); border-color: rgba(255, 215, 64, 0.2) !important; }
+.fraction-card--selected        { border-color: rgba(255, 215, 64, 0.5) !important; background: rgba(255, 215, 64, 0.06) !important; transform: translateY(-4px); }
+.fraction-card--confirmed       { cursor: default; opacity: 0.7; }
 .fraction-card--selected.fraction-card--confirmed { opacity: 1; }
 
 .fraction-glow {
@@ -246,15 +236,14 @@ async function checkBothReady() {
   transition: opacity 0.3s;
   pointer-events: none;
 }
-
 .fraction-card--selected .fraction-glow,
 .fraction-card:hover .fraction-glow { opacity: 0.15; }
 
-.fraction-name { font-size: 1rem; font-weight: 700; }
-.confirm-btn { font-weight: 700; letter-spacing: 0.05rem; }
+.fraction-name  { font-size: 1rem; font-weight: 700; }
+.confirm-btn    { font-weight: 700; letter-spacing: 0.05rem; }
 
 @keyframes shimmer {
-  0% { background-position: 0% center; }
+  0%   { background-position: 0% center; }
   100% { background-position: 200% center; }
 }
 </style>

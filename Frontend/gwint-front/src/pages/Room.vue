@@ -42,8 +42,6 @@
       </button>
 
       <button @click="leaveRoom">Wyjdź z pokoju</button>
-
-      <p v-if="gameStarted">Gra się zaczęła!</p>
     </div>
   </div>
 </template>
@@ -51,18 +49,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useSignalR } from '@/plugins/signalr'
+import { useSignalRStore } from '@/stores/signalr'
 import { usePlayerStore } from '@/stores/player'
 
-const { invoke, on, off } = useSignalR()
 const route = useRoute()
 const router = useRouter()
-const roomId = route.params.roomId
-
+const signalRStore = useSignalRStore()
 const playerStore = usePlayerStore()
 
+const roomId = route.params.roomId
 const players = ref([])
-const gameStarted = ref(false)
 const roomNotFound = ref(false)
 const roomFull = ref(false)
 
@@ -71,7 +67,7 @@ function onPlayersUpdated(logins) {
 }
 
 function onGameStarted() {
-  gameStarted.value = true
+  router.push({ name: 'fraction-select', params: { roomId } })
 }
 
 function onRoomNotFound() {
@@ -83,29 +79,39 @@ function onRoomFull() {
 }
 
 onMounted(async () => {
-  on('PlayersUpdated', onPlayersUpdated)
-  on('GameStarted', onGameStarted)
-  on('RoomNotFound', onRoomNotFound)
-  on('RoomFull', onRoomFull)
+  // Jeśli użytkownik odświeżył stronę – nie ma połączenia, wróć do lobby
+  if (!signalRStore.isConnected) {
+    await signalRStore.connectToRoom()
+  }
 
+  const conn = signalRStore.roomConnection
+  conn.on('PlayersUpdated', onPlayersUpdated)
+  conn.on('GameStarted', onGameStarted)
+  conn.on('RoomNotFound', onRoomNotFound)
+  conn.on('RoomFull', onRoomFull)
+
+  // joined: true = przyszliśmy z CreateRoom/JoinRoom i już wywołaliśmy JoinRoom/CreateRoom
+  // joined: false/brak = weszliśmy bezpośrednio przez URL, dopiero się łączymy
   const alreadyJoined = history.state?.joined
   if (!alreadyJoined) {
-    await invoke('JoinRoom', roomId, playerStore.displayName)
+    await conn.invoke('JoinRoom', roomId, playerStore.displayName)
   } else {
-    await invoke('GetPlayers', roomId)
+    await conn.invoke('GetPlayers', roomId)
   }
 })
 
 onUnmounted(() => {
-  off('PlayersUpdated', onPlayersUpdated)
-  off('GameStarted', onGameStarted)
-  off('RoomNotFound', onRoomNotFound)
-  off('RoomFull', onRoomFull)
+  const conn = signalRStore.roomConnection
+  if (!conn) return
+  conn.off('PlayersUpdated', onPlayersUpdated)
+  conn.off('GameStarted', onGameStarted)
+  conn.off('RoomNotFound', onRoomNotFound)
+  conn.off('RoomFull', onRoomFull)
 })
 
 async function leaveRoom() {
   try {
-    await invoke('LeaveRoom', roomId)
+    await signalRStore.roomConnection?.invoke('LeaveRoom', roomId)
   } catch (e) {
     console.error('Błąd przy wychodzeniu:', e)
   } finally {
@@ -114,6 +120,6 @@ async function leaveRoom() {
 }
 
 async function startGame() {
-  await invoke('StartGame', roomId)
+  await signalRStore.startRoomGame(roomId)
 }
 </script>
