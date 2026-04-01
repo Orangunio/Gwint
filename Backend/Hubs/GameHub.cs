@@ -21,6 +21,11 @@ namespace Backend.Hubs
             this.abilityUseCases = new AbilityUseCases();
         }
 
+        public async Task JoinGameRoom(string roomId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
+        }
+
         public async Task StartGame(string roomId, Fractions player1SelectedFraction, Fractions player2SelectedFraction)
         {
             if (RoomHub.rooms.TryGetValue(roomId, out var room) && room.Players.Count == 2)
