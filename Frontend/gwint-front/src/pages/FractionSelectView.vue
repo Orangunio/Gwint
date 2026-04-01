@@ -90,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSignalRStore } from '@/stores/signalr'
 
@@ -160,21 +160,32 @@ async function checkBothReady() {
   bothConfirmed.value = true
 
   try {
-    // Obaj gracze łączą się z GameHub
-    await signalRStore.connectToGame()
+    console.log('Obaj wybrali frakcje. Łączymy się z GameHub...')
 
-    // Tylko host wywołuje StartGame na GameHub
+    await signalRStore.connectToGame()
+    await new Promise(r => setTimeout(r, 800))
+
     if (signalRStore.amIHost) {
+      console.log('Jestem hostem → wywołuję StartGame')
       await signalRStore.startGame(myFraction, opponentFraction)
     }
 
-    await router.push({ name: 'game', params: { roomId } })
-  } catch (e) {
-    error.value = 'Nie można rozpocząć gry.'
+    console.log('Oczekuję na otrzymanie GameStarted...')
+
+  } catch (err) {
+    console.error('Błąd startu gry:', err)
+    error.value = 'Nie udało się rozpocząć gry.'
     gameStartInitiated = false
     bothConfirmed.value = false
   }
 }
+
+watch(() => signalRStore.game, (newGame) => {
+  if (newGame && route.name !== 'game') {
+    console.log('GameState otrzymany → przechodzimy na stronę gry')
+    router.push({ name: 'game', params: { roomId } })
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
