@@ -1,15 +1,18 @@
 <script setup>
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSignalR } from '@/plugins/signalr'
+import { useSignalRStore } from '@/stores/signalr'
 import { usePlayerStore } from '@/stores/player'
 
-const { invoke } = useSignalR()
 const router = useRouter()
+const signalRStore = useSignalRStore()
 const playerStore = usePlayerStore()
 
 async function create() {
-  const id = await invoke('CreateRoom', playerStore.displayName)
+  if (!signalRStore.isConnected) {
+    await signalRStore.connectToRoom()
+  }
+  // createRoom() w store ustawia isHost = true i zapisuje roomId
+  const id = await signalRStore.createRoom(playerStore.displayName)
   router.push({ name: 'Room', params: { roomId: id }, state: { joined: true } })
 }
 </script>
