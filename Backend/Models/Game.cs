@@ -9,7 +9,7 @@ namespace Backend.Models
         public Fractions Player1SelectedFraction { get; set; }
         public List<Card> Player1CardsOnHand { get; set; }
         public List<Card> Player1CardsOnDisplay { get; set; }
-        public List<Card> Player1CardInDeck { get; set; }
+        public List<Card> Player1CardsInDeck { get; set; }
         public Card Player1CommanderCard { get; set; }
         public int Player1Score { get; set; }
         public int Player1RoundsWon { get; set; }
@@ -20,7 +20,7 @@ namespace Backend.Models
         public Fractions Player2SelectedFraction { get; set; }
         public List<Card> Player2CardsOnHand { get; set; }
         public List<Card> Player2CardsOnDisplay { get; set; }
-        public List<Card> Player2CardInDeck { get; set; }
+        public List<Card> Player2CardsInDeck { get; set; }
         public Card Player2CommanderCard { get; set; }
         public int Player2Score { get; set; }
         public int Player2RoundsWon { get; set; }
@@ -33,10 +33,10 @@ namespace Backend.Models
         {
             Player1CardsOnHand = new List<Card>();
             Player1CardsOnDisplay = new List<Card>();
-            Player1CardInDeck = player1Deck;
+            Player1CardsInDeck = player1Deck;
             Player2CardsOnHand = new List<Card>();
             Player2CardsOnDisplay = new List<Card>();
-            Player2CardInDeck = player2Deck;
+            Player2CardsInDeck = player2Deck;
             Board = new Board();
             Player2SelectedFraction = player2SelectedFraction;
             Player1SelectedFraction = player1SelectedFraction;

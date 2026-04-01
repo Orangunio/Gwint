@@ -10,8 +10,15 @@ namespace Backend.Models
         public Fractions fraction { get; set; }
         public Abilities ability { get; set; }
         public int Strength { get; set; }
+
         [NotMapped]
-        public int finalStrength { get; set; }
+        public int finalStrength
+        {
+            get => _finalStrength == 0 ? Strength : _finalStrength;
+            set => _finalStrength = value;
+        }
+        private int _finalStrength;
+
         public Place place { get; set; }
         public bool isChampion { get; set; }
         public bool isCommander { get; set; }
@@ -19,8 +26,8 @@ namespace Backend.Models
 
         private Card() { }
 
-        public Card(string Name, Fractions fraction, Abilities ability, int Strength, Place place, bool isChampion, bool isCommander, bool isSpecial) 
-        { 
+        public Card(string Name, Fractions fraction, Abilities ability, int Strength, Place place, bool isChampion, bool isCommander, bool isSpecial)
+        {
             this.Name = Name;
             this.fraction = fraction;
             this.ability = ability;

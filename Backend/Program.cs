@@ -1,10 +1,11 @@
 ﻿using Backend.Database;
 using Backend.Hubs;
-using Microsoft.EntityFrameworkCore;
+using Backend.UseCases;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Backend.UseCases;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +25,11 @@ builder.Services.AddDbContext<GwintDBContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string not found.")));
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddSingleton<GameUseCases>();
 
 builder.Services.AddCors(options =>

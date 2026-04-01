@@ -54,12 +54,12 @@ namespace Backend.UseCases
 
             if (currentPlayer == game.Player1)
             {
-                playerDeck = game.Player1CardInDeck;
+                playerDeck = game.Player1CardsInDeck;
                 playerHand = game.Player1CardsOnHand;
             }
             else
             {
-                playerDeck = game.Player2CardInDeck;
+                playerDeck = game.Player2CardsInDeck;
                 playerHand = game.Player2CardsOnHand;
             }
 
@@ -105,12 +105,12 @@ namespace Backend.UseCases
 
             if (currentPlayer == game.Player1)
             {
-                playerDeck = game.Player1CardInDeck;
+                playerDeck = game.Player1CardsInDeck;
                 playerHand = game.Player1CardsOnHand;
             }
             else
             {
-                playerDeck = game.Player2CardInDeck;
+                playerDeck = game.Player2CardsInDeck;
                 playerHand = game.Player2CardsOnHand;
             }
 
@@ -499,21 +499,21 @@ namespace Backend.UseCases
         {
             if(game.CurrentPlayer == game.Player1)
             {
-                var fogCard = game.Player1CardInDeck.FirstOrDefault(c => c.ability == Abilities.gestaMgla);
+                var fogCard = game.Player1CardsInDeck.FirstOrDefault(c => c.ability == Abilities.gestaMgla);
                 if(fogCard != null)
                 {
                     game.Board.FogActive = true;
                 }
-                game.Player1CardInDeck.Remove(fogCard);
+                game.Player1CardsInDeck.Remove(fogCard);
             }
             else
             {
-                var fogCard = game.Player2CardInDeck.FirstOrDefault(c => c.ability == Abilities.gestaMgla);
+                var fogCard = game.Player2CardsInDeck.FirstOrDefault(c => c.ability == Abilities.gestaMgla);
                 if (fogCard != null)
                 {
                     game.Board.FogActive = true;
                 }
-                game.Player2CardInDeck.Remove(fogCard);
+                game.Player2CardsInDeck.Remove(fogCard);
             }
         }
 

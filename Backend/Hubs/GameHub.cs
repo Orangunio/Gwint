@@ -5,12 +5,14 @@ using Backend.UseCases;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Concurrent;
 using System.Numerics;
 
 namespace Backend.Hubs
 {
     public class GameHub : Hub
     {
+        private static readonly ConcurrentDictionary<string, string> roomToGameConnectionMap = new();
         private readonly GameUseCases gameUseCases;
         private readonly GwintDBContext gwintDBContext;
         private AbilityUseCases abilityUseCases;
@@ -21,78 +23,102 @@ namespace Backend.Hubs
             this.abilityUseCases = new AbilityUseCases();
         }
 
-        public async Task JoinGameRoom(string roomId)
+        private async Task SendGameStateToAll(string roomId, Game game)
+        {
+            await Clients.Group(roomId).SendAsync("GameStateUpdated", game);
+        }
+
+        public async Task JoinGameRoom(string roomId, string? roomConnectionId = null)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
+
+            if (roomConnectionId != null)
+            {
+                roomToGameConnectionMap[roomConnectionId] = Context.ConnectionId;
+
+                if (gameUseCases.games.TryGetValue(roomId, out var game))
+                {
+                    if (game.Player1?.ConnectionId == roomConnectionId)
+                    {
+                        game.Player1.ConnectionId = Context.ConnectionId;
+                        Console.WriteLine($"[GameHub] Player1 connectionId zaktualizowany: {Context.ConnectionId}");
+                    }
+                    else if (game.Player2?.ConnectionId == roomConnectionId)
+                    {
+                        game.Player2.ConnectionId = Context.ConnectionId;
+                        Console.WriteLine($"[GameHub] Player2 connectionId zaktualizowany: {Context.ConnectionId}");
+                    }
+                }
+            }
         }
 
         public async Task StartGame(string roomId, Fractions player1SelectedFraction, Fractions player2SelectedFraction)
         {
             if (!RoomHub.rooms.TryGetValue(roomId, out var room) || room?.Players?.Count != 2)
             {
-                Console.WriteLine($"[GameHub] Błąd: Pokój {roomId} nie istnieje lub nie ma 2 graczy.");
                 await Clients.Caller.SendAsync("Error", "Nieprawidłowy pokój lub brak drugiego gracza.");
                 return;
             }
 
-            Console.WriteLine($"[GameHub] StartGame rozpoczęty dla pokoju {roomId}");
+            // Host dołącza do grupy GameHub (bez aktualizacji connectionId — gra jeszcze nie istnieje)
+            await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
-            // Zapewniamy, że obaj gracze są w grupie GameHub
-            await JoinGameRoom(roomId);
+            var player1Db = await gwintDBContext.Players
+                .FirstOrDefaultAsync(p => p.Login == room.Players[0].Login);
+            var player2Db = await gwintDBContext.Players
+                .FirstOrDefaultAsync(p => p.Login == room.Players[1].Login);
 
-            var player1Id = room.Players[0].Id;
-            var player2Id = room.Players[1].Id;
+            if (player1Db == null || player2Db == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Nie znaleziono graczy w bazie.");
+                return;
+            }
 
-            // Pobieranie decków
             var player1Deck = await gwintDBContext.PlayerDecks
-                .Where(pd => pd.PlayerId == player1Id)
-                .Include(pd => pd.Card)
-                .Where(pd => pd.Card.fraction == player1SelectedFraction)
-                .OrderBy(pd => pd.CardId)
+                .Where(pd => pd.PlayerId == player1Db.Id)
                 .Select(pd => pd.Card)
-                .Take(25)
+                .Where(c => c.fraction == player1SelectedFraction)
                 .ToListAsync();
 
             var player2Deck = await gwintDBContext.PlayerDecks
-                .Where(pd => pd.PlayerId == player2Id)
-                .Include(pd => pd.Card)
-                .Where(pd => pd.Card.fraction == player2SelectedFraction)
-                .OrderBy(pd => pd.CardId)
+                .Where(pd => pd.PlayerId == player2Db.Id)
                 .Select(pd => pd.Card)
-                .Take(25)
+                .Where(c => c.fraction == player2SelectedFraction)
                 .ToListAsync();
+
+            if (player1Deck.Count == 0 || player2Deck.Count == 0)
+            {
+                Console.WriteLine("[GameHub] Błąd: Decki są puste.");
+            }
 
             var game = new Game(player1Deck, player2Deck, player1SelectedFraction, player2SelectedFraction);
 
+            // Kopiujemy graczy z RoomHub — connectionId to na razie roomConnectionId
             game.Player1 = room.Players[0];
             game.Player2 = room.Players[1];
             game.RoomId = roomId;
 
             game.Player1CommanderCard = player1Deck.FirstOrDefault(c => c.isCommander);
             game.Player2CommanderCard = player2Deck.FirstOrDefault(c => c.isCommander);
-
             if (game.Player1CommanderCard != null) player1Deck.Remove(game.Player1CommanderCard);
             if (game.Player2CommanderCard != null) player2Deck.Remove(game.Player2CommanderCard);
 
-            game.Player1CardInDeck = GameUseCases.Shuffle(player1Deck);
-            game.Player2CardInDeck = GameUseCases.Shuffle(player2Deck);
-
-            game.Player1CardsOnHand = game.Player1CardInDeck.Take(10).ToList();
-            game.Player2CardsOnHand = game.Player2CardInDeck.Take(10).ToList();
-
-            game.Player1CardInDeck = game.Player1CardInDeck.Skip(10).ToList();
-            game.Player2CardInDeck = game.Player2CardInDeck.Skip(10).ToList();
+            game.Player1CardsInDeck = GameUseCases.Shuffle(player1Deck);
+            game.Player2CardsInDeck = GameUseCases.Shuffle(player2Deck);
+            game.Player1CardsOnHand = game.Player1CardsInDeck.Take(10).ToList();
+            game.Player2CardsOnHand = game.Player2CardsInDeck.Take(10).ToList();
+            game.Player1CardsInDeck = game.Player1CardsInDeck.Skip(10).ToList();
+            game.Player2CardsInDeck = game.Player2CardsInDeck.Skip(10).ToList();
 
             if (game.Board == null) game.Board = new Board();
 
             gameUseCases.games.TryAdd(roomId, game);
 
-            Console.WriteLine($"[GameHub] Gra utworzona. Wysyłam GameStarted do grupy {roomId}");
+            Console.WriteLine($"[GameHub] Gra utworzona | P1: {game.Player1.ConnectionId} | P2: {game.Player2.ConnectionId}");
 
             await Clients.Group(roomId).SendAsync("GameStarted", game);
             await Clients.Group(roomId).SendAsync("TurnStarted", game.Player1.ConnectionId);
-
-            Console.WriteLine($"[GameHub] GameStarted wysłany | Player1: {game.Player1.ConnectionId} | Player2: {game.Player2.ConnectionId}");
+            await SendGameStateToAll(roomId, game);
         }
 
         public async Task SetFirstPlayer(string roomId, string chosenConnectionId)
@@ -129,6 +155,8 @@ namespace Backend.Hubs
                 await Clients.Group(roomId)
                     .SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
             }
+
+            await SendGameStateToAll(roomId, game);
         }
 
         public async Task ChooseFirstPlayer(string roomId)
@@ -196,6 +224,7 @@ namespace Backend.Hubs
             }
 
             await Clients.Group(roomId).SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
+            await SendGameStateToAll(roomId, game);
         }
         private bool HasRevivableCards(Game game)
         {
@@ -219,6 +248,10 @@ namespace Backend.Hubs
                 {
                     await FinishTurn(roomId, game);
                 }
+                else
+                {
+                    await SendGameStateToAll(roomId, game);
+                }
             }
         }
 
@@ -238,6 +271,7 @@ namespace Backend.Hubs
                 {
                     abilityUseCases.ManekinDoCwiczenAbility(game, cardOnBoard);
                     await FinishTurn(roomId, game);
+                    await SendGameStateToAll(roomId, game);
                     break;
                 }
             }
