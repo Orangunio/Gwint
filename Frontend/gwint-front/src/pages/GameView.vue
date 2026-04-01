@@ -120,44 +120,87 @@
         </div>
       </div>
 
-      <!-- ═══ RĘKA GRACZA ═══ -->
+      <!-- ═══ RĘKA GRACZA + TALIE ═══ -->
       <div class="player-hand-area">
-        <div class="hand-info">
-          <span class="text-caption text-medium-emphasis">
-            Karty w ręce: {{ signalRStore.myHand.length }}
-          </span>
-          <span class="text-caption text-medium-emphasis ml-4">
-            Cmentarz: {{ signalRStore.myGraveyard.length }}
-          </span>
-        </div>
-
-        <div class="hand-cards">
-          <!-- Karta dowódcy -->
-          <div class="commander-slot">
-            <GameCard
-              v-if="signalRStore.myCommander"
-              :card="signalRStore.myCommander"
-              :playable="signalRStore.myTurn && !commanderUsed"
-              :selected="selectedCard?.id === signalRStore.myCommander?.id"
-              @play="selectCard(signalRStore.myCommander!)"
-            />
-            <div v-else class="commander-empty">
-              <v-icon icon="mdi-account-off" size="24" color="grey-darken-1" />
+        <!-- Informacje o taliach i cmentarzach -->
+        <div class="deck-info-bar">
+          <!-- Talia przeciwnika -->
+          <div class="deck-info deck-info--opponent">
+            <div class="deck-visual">
+              <div class="deck-stack">
+                <div 
+                  v-for="i in Math.min(6, opponentDeckCount)" 
+                  :key="i" 
+                  class="deck-card"
+                  :style="{ transform: `translateY(-${i * 1.8}px) rotate(${i * 2}deg)` }"
+                ></div>
+              </div>
+              <span class="deck-count">{{ opponentDeckCount }}</span>
+            </div>
+            <div class="deck-label">
+              Talia przeciwnika<br>
+              <small>Ręka: {{ opponentHandCount }} • Cmentarz: {{ opponentGraveyardCount }}</small>
             </div>
           </div>
 
-          <div class="hand-divider" />
+          <!-- Środek – ręka gracza -->
+          <div class="hand-center">
+            <div class="hand-info">
+              <span class="text-caption text-medium-emphasis">
+                Karty w ręce: <strong>{{ signalRStore.myHand.length }}</strong>
+              </span>
+              <span class="text-caption text-medium-emphasis ml-3">
+                Talia: <strong>{{ myDeckCount }}</strong>
+              </span>
+            </div>
 
-          <!-- Karty w ręce -->
-          <div class="hand-scroll">
-            <GameCard
-              v-for="card in signalRStore.myHand"
-              :key="card.id"
-              :card="card"
-              :playable="signalRStore.myTurn"
-              :selected="selectedCard?.id === card.id"
-              @play="selectCard(card)"
-            />
+            <div class="hand-cards">
+              <!-- Karta dowódcy + karty w ręce (bez zmian) -->
+              <div class="commander-slot">
+                <GameCard
+                  v-if="signalRStore.myCommander"
+                  :card="signalRStore.myCommander"
+                  :playable="signalRStore.myTurn && !commanderUsed"
+                  :selected="selectedCard?.id === signalRStore.myCommander?.id"
+                  @play="selectCard(signalRStore.myCommander!)"
+                />
+                <div v-else class="commander-empty">
+                  <v-icon icon="mdi-account-off" size="24" color="grey-darken-1" />
+                </div>
+              </div>
+
+              <div class="hand-divider" />
+
+              <div class="hand-scroll">
+                <GameCard
+                  v-for="card in signalRStore.myHand"
+                  :key="card.id"
+                  :card="card"
+                  :playable="signalRStore.myTurn"
+                  :selected="selectedCard?.id === card.id"
+                  @play="selectCard(card)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Talia gracza -->
+          <div class="deck-info deck-info--me">
+            <div class="deck-label text-right">
+              Twoja talia<br>
+              <small>Ręka: {{ signalRStore.myHand.length }} • Cmentarz: {{ myGraveyardCount }}</small>
+            </div>
+            <div class="deck-visual">
+              <div class="deck-stack">
+                <div 
+                  v-for="i in Math.min(6, myDeckCount)" 
+                  :key="i" 
+                  class="deck-card"
+                  :style="{ transform: `translateY(-${i * 1.8}px) rotate(-${i * 2}deg)` }"
+                ></div>
+              </div>
+              <span class="deck-count">{{ myDeckCount }}</span>
+            </div>
           </div>
         </div>
 
@@ -478,6 +521,44 @@ onMounted(async () => {
 onUnmounted(async () => {
   await signalRStore.disconnect()
 })
+
+const myDeckCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player1CardsInDeck?.length ?? 0)
+    : (signalRStore.game.player2CardsInDeck?.length ?? 0)
+})
+
+const opponentDeckCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsInDeck?.length ?? 0)
+    : (signalRStore.game.player1CardsInDeck?.length ?? 0)
+})
+
+const myGraveyardCount = computed(() => signalRStore.myGraveyard.length)
+
+const opponentGraveyardCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsOnDisplay?.length ?? 0)  // tu może być problem
+    : (signalRStore.game.player1CardsOnDisplay?.length ?? 0)
+})
+
+// Dodatkowy computed – liczba kart przeciwnika na ręce (do ewentualnego debugu)
+const opponentHandCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsOnHand?.length ?? 0)
+    : (signalRStore.game.player1CardsOnHand?.length ?? 0)
+})
+
+watch(
+  () => signalRStore.gameConnectionId,
+  (newId) => {
+    console.log('gameConnectionId zmienione na:', newId)
+  }
+)
 </script>
 
 <style scoped>
@@ -701,5 +782,91 @@ onUnmounted(async () => {
   background: rgba(20, 20, 15, 0.95) !important;
   border: 1px solid rgba(255, 215, 64, 0.2) !important;
   backdrop-filter: blur(12px);
+}
+
+/* Deck info */
+.deck-info-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.deck-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+}
+
+.deck-info--opponent {
+  flex-direction: row;
+}
+
+.deck-info--me {
+  flex-direction: row-reverse;
+}
+
+.deck-visual {
+  position: relative;
+  width: 52px;
+  height: 74px;
+}
+
+.deck-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.deck-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: 74px;
+  background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
+  border: 2px solid #ffd74033;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+  z-index: 1;
+}
+
+.deck-count {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: #0d1a0d;
+  color: #ffd740;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid #ffd740;
+  z-index: 10;
+}
+
+.deck-label {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.deck-label small {
+  color: rgba(255,255,255,0.4);
+  font-size: 0.7rem;
+}
+
+/* Dostosowanie hand-center */
+.hand-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 </style>
