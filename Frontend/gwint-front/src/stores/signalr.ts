@@ -46,6 +46,8 @@ export interface GameState {
   player2CardsOnHand: GameCard[]
   player1CardsOnDisplay: GameCard[]
   player2CardsOnDisplay: GameCard[]
+  player1CardsInDeck: GameCard[]
+  player2CardsInDeck: GameCard[]
   player1CommanderCard: GameCard | null
   player2CommanderCard: GameCard | null
   board: GameBoard | null
@@ -111,54 +113,52 @@ export const useSignalRStore = defineStore('signalr', {
     isConnected: (state) => state.roomConnection?.state === signalR.HubConnectionState.Connected,
     isGameConnected: (state) => state.gameConnection?.state === signalR.HubConnectionState.Connected,
 
-    // NAPRAWKA: używamy gameConnectionId (connectionId z GameHub) do identyfikacji gracza
     myPlayer(state): GamePlayer | null {
-      if (!state.game || !state.gameConnectionId) return null
-      if (state.game.player1?.connectionId === state.gameConnectionId) return state.game.player1
-      if (state.game.player2?.connectionId === state.gameConnectionId) return state.game.player2
+      if (!state.game || !state.roomConnectionId) return null
+      if (state.game.player1?.connectionId === state.roomConnectionId) return state.game.player1
+      if (state.game.player2?.connectionId === state.roomConnectionId) return state.game.player2
       return null
     },
 
     opponentPlayer(state): GamePlayer | null {
-      if (!state.game || !state.gameConnectionId) return null
-      if (state.game.player1?.connectionId === state.gameConnectionId) return state.game.player2
+      if (!state.game || !state.roomConnectionId) return null
+      if (state.game.player1?.connectionId === state.roomConnectionId) return state.game.player2
       return state.game.player1
     },
 
     amIPlayer1(state): boolean {
-      if (!state.game || !state.gameConnectionId) return false
-      return state.game.player1?.connectionId === state.gameConnectionId
+      if (!state.game || !state.roomConnectionId) return false
+      return state.game.player1?.connectionId === state.roomConnectionId
     },
 
-    // NAPRAWKA: getter dla hoста
     amIHost(state): boolean {
       return state.isHost
     },
 
     myHand(state): GameCard[] {
-      if (!state.game || !state.gameConnectionId) return []
-      return state.game.player1?.connectionId === state.gameConnectionId
+      if (!state.game || !state.roomConnectionId) return []
+      return state.game.player1?.connectionId === state.roomConnectionId
         ? state.game.player1CardsOnHand
         : state.game.player2CardsOnHand
     },
 
     myCommander(state): GameCard | null {
-      if (!state.game || !state.gameConnectionId) return null
-      return state.game.player1?.connectionId === state.gameConnectionId
+      if (!state.game || !state.roomConnectionId) return null
+      return state.game.player1?.connectionId === state.roomConnectionId
         ? state.game.player1CommanderCard
         : state.game.player2CommanderCard
     },
 
     myGraveyard(state): GameCard[] {
-      if (!state.game || !state.gameConnectionId) return []
-      return state.game.player1?.connectionId === state.gameConnectionId
+      if (!state.game || !state.roomConnectionId) return []
+      return state.game.player1?.connectionId === state.roomConnectionId
         ? state.game.player1CardsOnDisplay
         : state.game.player2CardsOnDisplay
     },
 
     opponentGraveyard(state): GameCard[] {
-      if (!state.game || !state.gameConnectionId) return []
-      return state.game.player1?.connectionId === state.gameConnectionId
+      if (!state.game || !state.roomConnectionId) return []
+      return state.game.player1?.connectionId === state.roomConnectionId
         ? state.game.player2CardsOnDisplay
         : state.game.player1CardsOnDisplay
     },
@@ -200,18 +200,6 @@ export const useSignalRStore = defineStore('signalr', {
         this.roomPlayers = this.roomPlayers.filter(p => p !== login)
         this.isRoomReady = false
       })
-
-      // RoomHub GameStarted wysyła tylko roomId (string), nie obiekt gry
-      // conn.on('GameStarted', (game: GameState) => {
-      // console.log('✅ GameStarted otrzymany z GameHub!', game)
-      // console.log('Moje connectionId:', this.gameConnectionId)
-      // console.log('Player1 ID:', game.player1?.connectionId)
-      // console.log('Player2 ID:', game.player2?.connectionId)
-      // this.game = game
-      // this.myTurn = false
-      // this.pendingAction = null
-      // this.pendingCardId = null
-      // })
     },
 
     async createRoom(playerName: string): Promise<string> {
@@ -253,47 +241,42 @@ export const useSignalRStore = defineStore('signalr', {
         await conn.start()
         this.gameConnection = conn
         this.gameConnectionId = conn.connectionId
-        console.log('✅ GameHub połączony. ConnectionId:', this.gameConnectionId)
 
-        // <<< NAJWAŻNIEJSZA POPRAWKA >>>
         if (this.roomId) {
-          console.log(`Dołączam do grupy GameHub: ${this.roomId}`)
-          await conn.invoke('JoinGameRoom', this.roomId)
+          // Przekaż roomConnectionId żeby backend zmapował gracza
+          await conn.invoke('JoinGameRoom', this.roomId, this.roomConnectionId)
         }
 
       } catch (e) {
         this.error = 'Nie można połączyć z GameHub.'
-        console.error('Błąd connectToGame:', e)
         throw e
       }
     },
 
     setupGameListeners(conn: signalR.HubConnection) {
       conn.on('GameStarted', (game: GameState) => {
-        console.log('✅ [GameHub] GameStarted otrzymany!');
-        console.log('Moje gameConnectionId:', this.gameConnectionId);
-        console.log('Player1 connectionId:', game.player1?.connectionId);
-        console.log('Player2 connectionId:', game.player2?.connectionId);
+        console.log('GameStarted, mój connectionId:', this.gameConnectionId)
+        this.game = JSON.parse(JSON.stringify(game))  // głęboka kopia = pełna reaktywność
+        this.myTurn = false
+        this.pendingAction = null
+        this.pendingCardId = null
+      })
 
-        this.game = game;
-        this.myTurn = false;
-        this.pendingAction = null;
-        this.pendingCardId = null;
-
-        console.log('Gra załadowana pomyślnie. Oczekuję na przejście do widoku gry...');
-      });
+      conn.on('GameStateUpdated', (game: GameState) => {
+        this.game = JSON.parse(JSON.stringify(game))  // głęboka kopia
+      })
 
       conn.on('TurnStarted', (connectionId: string) => {
-        this.myTurn = connectionId === this.gameConnectionId;
-        this.pendingAction = null;
-        this.pendingCardId = null;
-      });
+        this.myTurn = connectionId === this.roomConnectionId  // ← zmiana
+        this.pendingAction = null
+        this.pendingCardId = null
+      })
 
       conn.on('NextTurn', (connectionId: string) => {
-        this.myTurn = connectionId === this.gameConnectionId;
-        this.pendingAction = null;
-        this.pendingCardId = null;
-      });
+        this.myTurn = connectionId === this.roomConnectionId  // ← zmiana
+        this.pendingAction = null
+        this.pendingCardId = null
+      })
 
       conn.on('ScoiataelChooseFirstPlayer', () => {
         this.pendingAction = 'agility';
