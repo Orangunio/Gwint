@@ -10,7 +10,12 @@
           <v-col cols="12" md="8" lg="6">
 
             <!-- Brak logowania -->
-            <v-card v-if="!playerStore.isLoggedIn" class="gwint-card text-center pa-8" rounded="xl" elevation="0">
+            <v-card
+              v-if="!playerStore.isLoggedIn"
+              class="gwint-card text-center pa-8"
+              rounded="xl"
+              elevation="0"
+            >
               <v-icon icon="mdi-lock" size="48" color="amber-darken-2" class="mb-4" />
               <h2 class="mb-3">Wymagane logowanie</h2>
               <p class="text-medium-emphasis mb-6">Aby grać, musisz się zalogować.</p>
@@ -20,8 +25,7 @@
             </v-card>
 
             <template v-else>
-
-              <!-- Oczekiwanie w pokoju -->
+              <!-- === EKRAN OCZEKIWANIA W POKOJU === -->
               <v-card
                 v-if="phase === 'waiting'"
                 class="gwint-card pa-8 text-center"
@@ -49,33 +53,34 @@
 
                 <v-divider class="mb-6" />
 
+                <!-- Lista graczy aktualizowana w czasie rzeczywistym -->
                 <div class="waiting-players mb-6">
                   <div
                     v-for="i in 2"
                     :key="i"
                     class="player-slot"
-                    :class="{ 'player-slot--filled': i === 1 || signalRStore.isRoomReady }"
+                    :class="{ 'player-slot--filled': players[i - 1] }"
                   >
                     <v-icon
-                      :icon="i === 1 || signalRStore.isRoomReady ? 'mdi-account-check' : 'mdi-account-clock'"
-                      :color="i === 1 || signalRStore.isRoomReady ? 'green' : 'grey'"
+                      :icon="players[i - 1] ? 'mdi-account-check' : 'mdi-account-clock'"
+                      :color="players[i - 1] ? 'green' : 'grey'"
                       size="28"
                     />
                     <span class="ml-2">
-                      {{ i === 1 ? playerStore.displayName : (signalRStore.isRoomReady ? 'Przeciwnik dołączył!' : 'Oczekiwanie...') }}
+                      {{ players[i - 1] ?? (i === 1 ? 'Oczekiwanie...' : 'Oczekiwanie na przeciwnika...') }}
                     </span>
                   </div>
                 </div>
 
                 <v-btn
-                    data-testid="start-room-game-button"
-                    v-if="signalRStore.isRoomReady"
-                    color="amber-darken-2"
-                    size="x-large"
-                    class="gwint-btn mb-4"
-                    prepend-icon="mdi-play"
-                    :loading="isStarting"
-                    @click="startGame"
+                  data-testid="start-room-game-button"
+                  v-if="isRoomReady"
+                  color="amber-darken-2"
+                  size="x-large"
+                  class="gwint-btn mb-4"
+                  prepend-icon="mdi-play"
+                  :loading="isStarting"
+                  @click="startGame"
                 >
                   Zacznij grę!
                 </v-btn>
@@ -86,17 +91,17 @@
                 </div>
 
                 <v-btn
-                    data-testid="leave-room-button"
-                    variant="text"
-                    size="small"
-                    class="mt-4"
-                    @click="leaveRoom"
+                  data-testid="leave-room-button"
+                  variant="text"
+                  size="small"
+                  class="mt-4"
+                  @click="leaveRoom"
                 >
                   Opuść pokój
                 </v-btn>
               </v-card>
 
-              <!-- Wybór akcji (główny ekran lobby) -->
+              <!-- === GŁÓWNY EKRAN LOBBY === -->
               <template v-else>
                 <div class="text-center mb-8">
                   <h1 class="lobby-title mb-2">
@@ -108,14 +113,13 @@
                 </div>
 
                 <v-row>
-                  <!-- Stwórz pokój -->
                   <v-col cols="12" sm="6">
                     <v-card
-                        data-testid="create-room-card"
-                        class="gwint-card action-card pa-6"
-                        rounded="xl"
-                        elevation="0"
-                        @click="handleCreate"
+                      data-testid="create-room-card"
+                      class="gwint-card action-card pa-6"
+                      rounded="xl"
+                      elevation="0"
+                      @click="handleCreate"
                     >
                       <div class="card-glow" />
                       <div class="text-center">
@@ -128,15 +132,14 @@
                     </v-card>
                   </v-col>
 
-                  <!-- Dołącz do pokoju -->
                   <v-col cols="12" sm="6">
                     <v-card
-                        data-testid="join-room-card"
-                        class="gwint-card action-card pa-6"
-                        rounded="xl"
-                        elevation="0"
-                        :class="{ 'action-card--open': phase === 'join' }"
-                        @click="phase = 'join'"
+                      data-testid="join-room-card"
+                      class="gwint-card action-card pa-6"
+                      rounded="xl"
+                      elevation="0"
+                      :class="{ 'action-card--open': phase === 'join' }"
+                      @click="phase = 'join'"
                     >
                       <div class="card-glow" />
                       <div class="text-center">
@@ -150,14 +153,13 @@
                   </v-col>
                 </v-row>
 
-                <!-- Formularz dołączania -->
+                <!-- Formularz dołączenia -->
                 <v-expand-transition>
                   <v-card
-                      data-testid="join-room-form"
-                      v-if="phase === 'join'"
-                      class="gwint-card mt-4 pa-6"
-                      rounded="xl"
-                      elevation="0"
+                    v-if="phase === 'join'"
+                    class="gwint-card mt-4 pa-6"
+                    rounded="xl"
+                    elevation="0"
                   >
                     <h3 class="mb-4">Wpisz kod pokoju</h3>
                     <v-text-field
@@ -171,15 +173,15 @@
                     />
                     <div class="d-flex ga-3">
                       <v-btn
-                          data-testid="join-submit-button"
-                          color="blue-lighten-2"
-                          :loading="isJoining"
-                          :disabled="joinCode.length < 6"
-                          @click="handleJoin"
+                        data-testid="join-submit-button"
+                        color="blue-lighten-2"
+                        :loading="isJoining"
+                        :disabled="joinCode.length < 6"
+                        @click="handleJoin"
                       >
                         Dołącz
                       </v-btn>
-                      <v-btn data-testid="join-cancel-button" variant="text" @click="phase = 'menu'">Anuluj</v-btn>
+                      <v-btn variant="text" @click="phase = 'menu'">Anuluj</v-btn>
                     </div>
                   </v-card>
                 </v-expand-transition>
@@ -191,6 +193,8 @@
                   type="error"
                   variant="tonal"
                   density="comfortable"
+                  closable
+                  @click:close="signalRStore.error = null"
                 >
                   {{ signalRStore.error }}
                 </v-alert>
@@ -207,10 +211,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+
 import { usePlayerStore } from '@/stores/player'
 import { useSignalRStore } from '@/stores/signalr'
 import { useAppStore } from '@/stores/app'
@@ -226,37 +232,102 @@ const joinCode = ref('')
 const isJoining = ref(false)
 const isStarting = ref(false)
 
+// Lista graczy aktualizowana przez SignalR w czasie rzeczywistym
+const players = ref<string[]>([])
+const isRoomReady = computed(() => players.value.length >= 2)
+
+// ====================== HANDLERY ZDARZEŃ SIGNALR ======================
+
+function onPlayersUpdated(logins: string[]) {
+  players.value = logins
+}
+
+function onGameStarted(roomId: string) {
+  router.push({ name: 'fraction-select', params: { roomId } })
+}
+
+function onRoomNotFound() {
+  signalRStore.error = 'Pokój nie istnieje. Sprawdź kod.'
+  phase.value = 'menu'
+}
+
+function onRoomFull() {
+  signalRStore.error = 'Pokój jest już pełny.'
+  phase.value = 'menu'
+}
+
+function registerHubListeners() {
+  const conn = signalRStore.roomConnection
+  if (!conn) return
+  conn.on('PlayersUpdated', onPlayersUpdated)
+  conn.on('GameStarted', onGameStarted)
+  conn.on('RoomNotFound', onRoomNotFound)
+  conn.on('RoomFull', onRoomFull)
+}
+
+function unregisterHubListeners() {
+  const conn = signalRStore.roomConnection
+  if (!conn) return
+  conn.off('PlayersUpdated', onPlayersUpdated)
+  conn.off('GameStarted', onGameStarted)
+  conn.off('RoomNotFound', onRoomNotFound)
+  conn.off('RoomFull', onRoomFull)
+}
+
+// ====================== LIFECYCLE ======================
+
 onMounted(async () => {
   if (!playerStore.isLoggedIn) return
-  await signalRStore.connectToRoom()
-
-  // Nasłuchuj na GameStarted z RoomHub → przejdź do wyboru frakcji
-  signalRStore.roomConnection?.on('GameStarted', async (roomId: string) => {
-    await router.push({ name: 'fraction-select', params: { roomId } })
-  })
+  if (!signalRStore.isConnected) {
+    await signalRStore.connectToRoom()
+  }
+  registerHubListeners()
 })
 
 onUnmounted(() => {
-  signalRStore.roomConnection?.off('GameStarted')
+  unregisterHubListeners()
 })
+
+// ====================== AKCJE ======================
 
 async function handleCreate() {
   try {
+    if (!signalRStore.isConnected) {
+      await signalRStore.connectToRoom()
+    }
+
+    // createRoom() ustawia isHost = true i zapisuje roomId w store
     const roomId = await signalRStore.createRoom(playerStore.displayName)
+
+    // Pobierz aktualną listę graczy (twórca od razu jest w pokoju)
+    await signalRStore.roomConnection?.invoke('GetPlayers', roomId)
+
     phase.value = 'waiting'
-    appStore.addNotification(`Pokój ${roomId} stworzony!`)
-  } catch {
+    appStore.addNotification(`Pokój ${roomId} został stworzony!`)
+  } catch (err) {
+    console.error(err)
     signalRStore.error = 'Nie można stworzyć pokoju.'
   }
 }
 
 async function handleJoin() {
-  if (joinCode.value.length < 6) return
+  const code = joinCode.value.trim()
+  if (code.length < 6) return
+
   isJoining.value = true
   try {
-    await signalRStore.joinRoom(joinCode.value.toUpperCase(), playerStore.displayName)
+    if (!signalRStore.isConnected) {
+      await signalRStore.connectToRoom()
+    }
+
+    // joinRoom() ustawia isHost = false i zapisuje roomId w store
+    // Serwer powinien rozesłać PlayersUpdated do wszystkich w pokoju
+    await signalRStore.joinRoom(code, playerStore.displayName)
+
+    joinCode.value = ''
     phase.value = 'waiting'
-  } catch {
+  } catch (err) {
+    console.error(err)
     signalRStore.error = 'Nie można dołączyć do pokoju. Sprawdź kod.'
   } finally {
     isJoining.value = false
@@ -268,23 +339,31 @@ async function startGame() {
   isStarting.value = true
   try {
     await signalRStore.startRoomGame(signalRStore.roomId)
-  } catch {
+  } catch (err) {
+    console.error(err)
     signalRStore.error = 'Nie można rozpocząć gry.'
+  } finally {
     isStarting.value = false
   }
 }
 
-function leaveRoom() {
-  signalRStore.roomId = null
-  signalRStore.isRoomReady = false
-  phase.value = 'menu'
+async function leaveRoom() {
+  try {
+    await signalRStore.roomConnection?.invoke('LeaveRoom', signalRStore.roomId)
+  } catch (e) {
+    console.error('Błąd przy wychodzeniu:', e)
+  } finally {
+    players.value = []
+    signalRStore.roomId = null
+    signalRStore.isRoomReady = false
+    phase.value = 'menu'
+  }
 }
 
 function copyRoomId() {
-  if (signalRStore.roomId) {
-    navigator.clipboard.writeText(signalRStore.roomId)
-    appStore.addNotification('Kod pokoju skopiowany!')
-  }
+  if (!signalRStore.roomId) return
+  navigator.clipboard.writeText(signalRStore.roomId)
+  appStore.addNotification('Kod pokoju skopiowany!')
 }
 </script>
 

@@ -8,105 +8,157 @@
     </div>
 
     <template v-else>
-      <!-- ═══ TOPBAR ═══ -->
-      <div class="game-topbar">
-        <div class="player-info player-info--opponent">
-          <v-icon icon="mdi-account" size="18" color="red-lighten-2" />
-          <span>{{ signalRStore.opponentPlayer?.login ?? 'Przeciwnik' }}</span>
-          <div class="round-gems">
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- GÓRA — pasek przeciwnika                               -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="opponent-bar">
+        <!-- Dowódca przeciwnika (widoczny) -->
+        <div class="opponent-commander-slot">
+          <div class="slot-label">Dowódca</div>
+          <GameCard
+            v-if="opponentCommander"
+            :card="opponentCommander"
+            :playable="false"
+            class="commander-card"
+          />
+          <div v-else class="card-placeholder">
+            <v-icon icon="mdi-account-off" size="20" color="grey-darken-1" />
+          </div>
+          <div class="slot-name">{{ signalRStore.opponentPlayer?.login ?? 'Przeciwnik' }}</div>
+        </div>
+
+        <!-- Karty na ręce przeciwnika (rewers) -->
+        <div class="opponent-hand-area">
+          <div class="slot-label">Ręka ({{ opponentHandCount }})</div>
+          <div class="opponent-hand-cards">
             <div
-              v-for="i in 2"
+              v-for="i in Math.min(opponentHandCount, 12)"
               :key="i"
-              class="round-gem"
-              :class="{ 'round-gem--won': opponentRoundsWon >= i }"
+              class="card-back"
+              :style="{ transform: `rotate(${(i - Math.min(opponentHandCount, 12) / 2) * 3}deg) translateY(${Math.abs(i - Math.min(opponentHandCount, 12) / 2) * 2}px)` }"
             />
           </div>
         </div>
 
-        <div class="game-round-info">
-          <span class="round-label">Runda</span>
-          <v-chip color="amber-darken-2" size="small" variant="tonal">
-            {{ currentRound }}
-          </v-chip>
-        </div>
-
-        <div class="player-info player-info--me">
-          <div class="round-gems">
-            <div
-              v-for="i in 2"
-              :key="i"
-              class="round-gem"
-              :class="{ 'round-gem--won': myRoundsWon >= i }"
-            />
+        <!-- Talia i cmentarz przeciwnika -->
+        <div class="opponent-decks">
+          <div class="deck-pile">
+            <div class="deck-icon-stack">
+              <div v-for="i in Math.min(5, opponentDeckCount)" :key="i" class="mini-card-back"
+                :style="{ bottom: `${i * 1.5}px`, right: `${i * 0.5}px` }" />
+            </div>
+            <div class="deck-badge">{{ opponentDeckCount }}</div>
+            <div class="slot-label mt-1">Talia</div>
           </div>
-          <span>{{ signalRStore.myPlayer?.login ?? 'Ty' }}</span>
-          <v-icon icon="mdi-account" size="18" color="amber-darken-2" />
+          <div class="deck-pile">
+            <v-icon icon="mdi-grave-stone" size="28" color="grey-darken-1" />
+            <div class="deck-badge graveyard-badge">{{ opponentGraveyardCount }}</div>
+            <div class="slot-label mt-1">Cmentarz</div>
+          </div>
         </div>
       </div>
 
-      <!-- ═══ PLANSZA ═══ -->
-      <div class="game-board">
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- GŁÓWNA CZĘŚĆ — lewa belka + plansza                    -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="game-main">
 
-        <!-- Rzędy przeciwnika (odwrócone — najdalszy rząd na górze) -->
-        <div class="board-side board-side--opponent">
-          <div class="side-score">
-            <div class="total-score" :class="{ 'total-score--leading': opponentLeading }">
+        <!-- LEWA BELKA — score, rundy, pogoda -->
+        <div class="side-panel">
+
+          <!-- Wynik i rundy przeciwnika -->
+          <div class="score-block score-block--opponent">
+            <div class="score-gems">
+              <div v-for="i in 2" :key="i"
+                class="score-gem" :class="{ 'score-gem--won': opponentRoundsWon >= i }" />
+            </div>
+            <div class="score-value" :class="{ 'score-value--leading': opponentLeading }">
               {{ opponentTotal }}
             </div>
-            <div class="text-caption text-medium-emphasis">pkt</div>
+            <div class="score-sub">pkt</div>
           </div>
 
-          <div class="rows-stack">
+          <!-- Efekty pogodowe (centrum belki) -->
+          <div class="weather-section">
+            <div class="weather-title">Pogoda</div>
+            <div class="weather-icons">
+              <div v-if="board?.frostActive" class="weather-icon weather-icon--frost"
+                title="Mróz">
+                <v-icon icon="mdi-snowflake" size="18" />
+              </div>
+              <div v-if="board?.fogActive" class="weather-icon weather-icon--fog"
+                title="Mgła">
+                <v-icon icon="mdi-weather-fog" size="18" />
+              </div>
+              <div v-if="board?.rainActive" class="weather-icon weather-icon--rain"
+                title="Deszcz">
+                <v-icon icon="mdi-weather-pouring" size="18" />
+              </div>
+              <div v-if="!board?.frostActive && !board?.fogActive && !board?.rainActive"
+                class="weather-none">
+                <v-icon icon="mdi-weather-sunny" size="16" color="grey-darken-2" />
+              </div>
+            </div>
+
+            <!-- Wskaźnik tury -->
+            <div class="turn-block" :class="{ 'turn-block--active': signalRStore.myTurn }">
+              <v-icon
+                :icon="signalRStore.myTurn ? 'mdi-sword' : 'mdi-timer-sand'"
+                size="20"
+              />
+              <span>{{ signalRStore.myTurn ? 'Twoja tura' : 'Przeciwnik' }}</span>
+            </div>
+
+            <!-- Runda -->
+            <div class="round-indicator">
+              <span class="round-label-text">Runda</span>
+              <span class="round-number">{{ currentRound }}</span>
+            </div>
+          </div>
+
+          <!-- Wynik i rundy gracza -->
+          <div class="score-block score-block--me">
+            <div class="score-value" :class="{ 'score-value--leading': myLeading }">
+              {{ myTotal }}
+            </div>
+            <div class="score-sub">pkt</div>
+            <div class="score-gems">
+              <div v-for="i in 2" :key="i"
+                class="score-gem" :class="{ 'score-gem--won': myRoundsWon >= i }" />
+            </div>
+          </div>
+        </div>
+
+        <!-- PLANSZA GRY — rzędy -->
+        <div class="board-area">
+
+          <!-- Rzędy przeciwnika (od góry: oblężenie → dystans → piechota) -->
+          <div class="board-rows board-rows--opponent">
             <GameRow
               v-for="(row, idx) in opponentRows"
-              :key="idx"
+              :key="'opp-' + idx"
               :cards="row"
               :row-index="2 - idx"
               :row-score="opponentRowScores[2 - idx]"
-              :frost-active="signalRStore.game.board?.frostActive"
-              :fog-active="signalRStore.game.board?.fogActive"
-              :rain-active="signalRStore.game.board?.rainActive"
+              :frost-active="board?.frostActive"
+              :fog-active="board?.fogActive"
+              :rain-active="board?.rainActive"
             />
           </div>
-        </div>
 
-        <!-- Separator ze statusem tury -->
-        <div class="board-separator">
-          <div class="turn-indicator" :class="{ 'turn-indicator--my': signalRStore.myTurn }">
-            <v-icon
-              :icon="signalRStore.myTurn ? 'mdi-sword' : 'mdi-timer-sand'"
-              size="20"
-              :color="signalRStore.myTurn ? 'amber-darken-2' : 'grey'"
-            />
-            <span>{{ signalRStore.myTurn ? 'Twoja tura' : 'Tura przeciwnika' }}</span>
-          </div>
-          <!-- Pogoda aktywna -->
-          <div class="weather-bar">
-            <div v-if="board?.frostActive" class="weather-chip">
-              <v-icon icon="mdi-snowflake" size="14" color="blue-lighten-3" />
-            </div>
-            <div v-if="board?.fogActive" class="weather-chip">
-              <v-icon icon="mdi-weather-fog" size="14" color="blue-lighten-3" />
-            </div>
-            <div v-if="board?.rainActive" class="weather-chip">
-              <v-icon icon="mdi-weather-pouring" size="14" color="blue-lighten-3" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Rzędy gracza -->
-        <div class="board-side board-side--me">
-          <div class="side-score">
-            <div class="total-score" :class="{ 'total-score--leading': myLeading }">
-              {{ myTotal }}
-            </div>
-            <div class="text-caption text-medium-emphasis">pkt</div>
+          <!-- Linia środkowa -->
+          <div class="board-divider">
+            <div class="divider-line" />
+            <div class="divider-ornament">⚔</div>
+            <div class="divider-line" />
           </div>
 
-          <div class="rows-stack">
+          <!-- Rzędy gracza (od góry: piechota → dystans → oblężenie) -->
+          <div class="board-rows board-rows--me">
             <GameRow
               v-for="(row, idx) in myRows"
-              :key="idx"
+              :key="'my-' + idx"
               :cards="row"
               :row-index="idx"
               :row-score="myRowScores[idx]"
@@ -120,114 +172,83 @@
         </div>
       </div>
 
-      <!-- ═══ RĘKA GRACZA + TALIE ═══ -->
-      <div class="player-hand-area">
-        <!-- Informacje o taliach i cmentarzach -->
-        <div class="deck-info-bar">
-          <!-- Talia przeciwnika -->
-          <div class="deck-info deck-info--opponent">
-            <div class="deck-visual">
-              <div class="deck-stack">
-                <div 
-                  v-for="i in Math.min(6, opponentDeckCount)" 
-                  :key="i" 
-                  class="deck-card"
-                  :style="{ transform: `translateY(-${i * 1.8}px) rotate(${i * 2}deg)` }"
-                ></div>
-              </div>
-              <span class="deck-count">{{ opponentDeckCount }}</span>
-            </div>
-            <div class="deck-label">
-              Talia przeciwnika<br>
-              <small>Ręka: {{ opponentHandCount }} • Cmentarz: {{ opponentGraveyardCount }}</small>
-            </div>
-          </div>
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- DÓŁ — ręka gracza                                      -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div class="player-bar">
 
-          <!-- Środek – ręka gracza -->
-          <div class="hand-center">
-            <div class="hand-info">
-              <span class="text-caption text-medium-emphasis">
-                Karty w ręce: <strong>{{ signalRStore.myHand.length }}</strong>
-              </span>
-              <span class="text-caption text-medium-emphasis ml-3">
-                Talia: <strong>{{ myDeckCount }}</strong>
-              </span>
-            </div>
-
-            <div class="hand-cards">
-              <!-- Karta dowódcy + karty w ręce (bez zmian) -->
-              <div class="commander-slot">
-                <GameCard
-                  v-if="signalRStore.myCommander"
-                  :card="signalRStore.myCommander"
-                  :playable="signalRStore.myTurn && !commanderUsed"
-                  :selected="selectedCard?.id === signalRStore.myCommander?.id"
-                  @play="selectCard(signalRStore.myCommander!)"
-                />
-                <div v-else class="commander-empty">
-                  <v-icon icon="mdi-account-off" size="24" color="grey-darken-1" />
-                </div>
-              </div>
-
-              <div class="hand-divider" />
-
-              <div class="hand-scroll">
-                <GameCard
-                  v-for="card in signalRStore.myHand"
-                  :key="card.id"
-                  :card="card"
-                  :playable="signalRStore.myTurn"
-                  :selected="selectedCard?.id === card.id"
-                  @play="selectCard(card)"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Talia gracza -->
-          <div class="deck-info deck-info--me">
-            <div class="deck-label text-right">
-              Twoja talia<br>
-              <small>Ręka: {{ signalRStore.myHand.length }} • Cmentarz: {{ myGraveyardCount }}</small>
-            </div>
-            <div class="deck-visual">
-              <div class="deck-stack">
-                <div 
-                  v-for="i in Math.min(6, myDeckCount)" 
-                  :key="i" 
-                  class="deck-card"
-                  :style="{ transform: `translateY(-${i * 1.8}px) rotate(-${i * 2}deg)` }"
-                ></div>
-              </div>
-              <span class="deck-count">{{ myDeckCount }}</span>
-            </div>
+        <!-- Dowódca gracza (lewa strona) -->
+        <div class="player-commander-slot">
+          <div class="slot-label">Dowódca</div>
+          <GameCard
+            v-if="signalRStore.myCommander"
+            :card="signalRStore.myCommander"
+            :playable="signalRStore.myTurn && !commanderUsed"
+            :selected="selectedCard?.id === signalRStore.myCommander?.id"
+            class="commander-card"
+            @play="selectCard(signalRStore.myCommander!)"
+          />
+          <div v-else class="card-placeholder">
+            <v-icon icon="mdi-account-off" size="20" color="grey-darken-1" />
           </div>
         </div>
 
-        <!-- Akcje -->
-        <div class="hand-actions">
-          <v-btn
-            v-if="selectedCard"
-            color="amber-darken-2"
-            size="small"
-            prepend-icon="mdi-close"
-            variant="text"
-            @click="selectedCard = null"
-          >
-            Odznacz
-          </v-btn>
+        <!-- Karty na ręce (środek) -->
+        <div class="player-hand">
+          <div class="hand-header">
+            <span class="slot-label">Ręka ({{ signalRStore.myHand.length }})</span>
+            <div class="hand-actions">
+              <v-btn
+                v-if="selectedCard"
+                color="amber-darken-2"
+                size="x-small"
+                prepend-icon="mdi-close"
+                variant="text"
+                @click="selectedCard = null"
+              >
+                Odznacz
+              </v-btn>
+              <v-btn
+                v-if="signalRStore.myTurn"
+                color="grey"
+                size="x-small"
+                variant="outlined"
+                prepend-icon="mdi-flag"
+                :disabled="!!selectedCard"
+                @click="pass"
+              >
+                Pasuj
+              </v-btn>
+            </div>
+          </div>
 
-          <v-btn
-            v-if="signalRStore.myTurn"
-            color="grey"
-            size="small"
-            variant="outlined"
-            prepend-icon="mdi-flag"
-            :disabled="!!selectedCard"
-            @click="pass"
-          >
-            Pasuj
-          </v-btn>
+          <div class="hand-cards-scroll">
+            <GameCard
+              v-for="card in signalRStore.myHand"
+              :key="card.id"
+              :card="card"
+              :playable="signalRStore.myTurn"
+              :selected="selectedCard?.id === card.id"
+              @play="selectCard(card)"
+            />
+          </div>
+        </div>
+
+        <!-- Talia i cmentarz gracza (prawa strona) -->
+        <div class="player-decks">
+          <div class="deck-pile">
+            <div class="deck-icon-stack">
+              <div v-for="i in Math.min(5, myDeckCount)" :key="i" class="mini-card-stack"
+                :style="{ bottom: `${i * 1.5}px`, right: `${i * 0.5}px` }" />
+            </div>
+            <div class="deck-badge">{{ myDeckCount }}</div>
+            <div class="slot-label mt-1">Talia</div>
+          </div>
+          <div class="deck-pile">
+            <v-icon icon="mdi-grave-stone" size="28" color="grey-darken-1" />
+            <div class="deck-badge graveyard-badge">{{ myGraveyardCount }}</div>
+            <div class="slot-label mt-1">Cmentarz</div>
+          </div>
         </div>
       </div>
 
@@ -299,18 +320,20 @@
       </v-dialog>
 
     </template>
+
+    <!-- Debug overlay -->
+    <!-- <div style="position:fixed;top:0;left:0;z-index:9999;background:black;color:lime;font-size:11px;padding:8px;max-width:400px;max-height:300px;overflow:auto">
+      <div>isGameConnected: {{ signalRStore.isGameConnected }}</div>
+      <div>gameConnectionId: {{ signalRStore.gameConnectionId }}</div>
+      <div>game is null: {{ signalRStore.game === null }}</div>
+      <div>game.player1: {{ signalRStore.game?.player1?.connectionId }}</div>
+      <div>game.player2: {{ signalRStore.game?.player2?.connectionId }}</div>
+      <div>amIPlayer1: {{ signalRStore.amIPlayer1 }}</div>
+      <div>amIHost: {{ signalRStore.amIHost }}</div>
+      <div>myTurn: {{ signalRStore.myTurn }}</div>
+      <div>myHand.length: {{ signalRStore.myHand.length }}</div>
+    </div> -->
   </div>
-  <div style="position:fixed;top:0;left:0;z-index:9999;background:black;color:lime;font-size:11px;padding:8px;max-width:400px;max-height:300px;overflow:auto">
-  <div>isGameConnected: {{ signalRStore.isGameConnected }}</div>
-  <div>gameConnectionId: {{ signalRStore.gameConnectionId }}</div>
-  <div>game is null: {{ signalRStore.game === null }}</div>
-  <div>game.player1: {{ signalRStore.game?.player1?.connectionId }}</div>
-  <div>game.player2: {{ signalRStore.game?.player2?.connectionId }}</div>
-  <div>amIPlayer1: {{ signalRStore.amIPlayer1 }}</div>
-  <div>amIHost: {{ signalRStore.amIHost }}</div>
-  <div>myTurn: {{ signalRStore.myTurn }}</div>
-  <div>myHand.length: {{ signalRStore.myHand.length }}</div>
-</div>
 </template>
 
 <script setup lang="ts">
@@ -334,6 +357,14 @@ const currentRound = ref(1)
 const board = computed(() => signalRStore.game?.board)
 const amIP1 = computed(() => signalRStore.amIPlayer1)
 
+// Dowódca przeciwnika — zakładamy że store ma opponentCommander lub wyciągamy z game
+const opponentCommander = computed(() => {
+  if (!signalRStore.game) return null
+  return amIP1.value
+    ? signalRStore.game.player2CommanderCard ?? null
+    : signalRStore.game.player1CommanderCard ?? null
+})
+
 const myRows = computed(() => {
   if (!board.value) return [[], [], []]
   return amIP1.value
@@ -343,7 +374,6 @@ const myRows = computed(() => {
 
 const opponentRows = computed(() => {
   if (!board.value) return [[], [], []]
-  // Odwrócone — rząd oblężenia na górze, piechota przy linii środkowej
   return amIP1.value
     ? [board.value.player2ThirdCardRow, board.value.player2SecondCardRow, board.value.player2FirstCardRow]
     : [board.value.player1ThirdCardRow, board.value.player1SecondCardRow, board.value.player1FirstCardRow]
@@ -352,25 +382,15 @@ const opponentRows = computed(() => {
 const myRowScores = computed(() => {
   const scores = board.value?.rowScores
   if (!scores || scores.length === 0) return [0, 0, 0]
-  
   const p = amIP1.value ? 0 : 1
-  return [
-    scores[p]?.[0] ?? 0,
-    scores[p]?.[1] ?? 0,
-    scores[p]?.[2] ?? 0
-  ]
+  return [scores[p]?.[0] ?? 0, scores[p]?.[1] ?? 0, scores[p]?.[2] ?? 0]
 })
 
 const opponentRowScores = computed(() => {
   const scores = board.value?.rowScores
   if (!scores || scores.length === 0) return [0, 0, 0]
-  
   const p = amIP1.value ? 1 : 0
-  return [
-    scores[p]?.[0] ?? 0,
-    scores[p]?.[1] ?? 0,
-    scores[p]?.[2] ?? 0
-  ]
+  return [scores[p]?.[0] ?? 0, scores[p]?.[1] ?? 0, scores[p]?.[2] ?? 0]
 })
 
 const myTotal = computed(() => myRowScores.value.reduce((a, b) => a + b, 0))
@@ -379,27 +399,15 @@ const myLeading = computed(() => myTotal.value > opponentTotal.value)
 const opponentLeading = computed(() => opponentTotal.value > myTotal.value)
 
 const myRoundsWon = computed(() =>
-  amIP1.value
-    ? (signalRStore.game?.player1RoundsWon ?? 0)
-    : (signalRStore.game?.player2RoundsWon ?? 0),
+  amIP1.value ? (signalRStore.game?.player1RoundsWon ?? 0) : (signalRStore.game?.player2RoundsWon ?? 0)
 )
 const opponentRoundsWon = computed(() =>
-  amIP1.value
-    ? (signalRStore.game?.player2RoundsWon ?? 0)
-    : (signalRStore.game?.player1RoundsWon ?? 0),
+  amIP1.value ? (signalRStore.game?.player2RoundsWon ?? 0) : (signalRStore.game?.player1RoundsWon ?? 0)
 )
 
-const myBoardCards = computed(() => [
-  ...myRows.value[0],
-  ...myRows.value[1],
-  ...myRows.value[2],
-])
+const myBoardCards = computed(() => [...myRows.value[0], ...myRows.value[1], ...myRows.value[2]])
+const revivableCards = computed(() => signalRStore.myGraveyard.filter(c => !c.isChampion && !c.isSpecial))
 
-const revivableCards = computed(() =>
-  signalRStore.myGraveyard.filter(c => !c.isChampion && !c.isSpecial),
-)
-
-// Dialogi
 const showAgilityDialog = computed(() => signalRStore.pendingAction === 'agility')
 const showResurrectionDialog = computed(() => signalRStore.pendingAction === 'resurrection')
 const showDecoyDialog = computed(() => signalRStore.pendingAction === 'decoy')
@@ -410,14 +418,42 @@ const agilityRows = [
   { label: 'Oblężenie', value: 3, color: 'blue-lighten-2' },
 ]
 
+const myDeckCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player1CardsInDeck?.length ?? 0)
+    : (signalRStore.game.player2CardsInDeck?.length ?? 0)
+})
+
+const opponentDeckCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsInDeck?.length ?? 0)
+    : (signalRStore.game.player1CardsInDeck?.length ?? 0)
+})
+
+const myGraveyardCount = computed(() => signalRStore.myGraveyard.length)
+
+const opponentGraveyardCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsOnDisplay?.length ?? 0)
+    : (signalRStore.game.player1CardsOnDisplay?.length ?? 0)
+})
+
+const opponentHandCount = computed(() => {
+  if (!signalRStore.game) return 0
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsOnHand?.length ?? 0)
+    : (signalRStore.game.player1CardsOnHand?.length ?? 0)
+})
+
 // ─── LOGIKA PLACE ───────────────────────────────────────────────────
 
-// Enum Place z backendu
-// 0=bez rzędu, 1=R1, 2=R2, 3=R3, 12=R1+R2, 23=R2+R3, 13=R1+R3, 123=wszystkie
 function canPlayInRow(card: GameCardType, rowIdx: number): boolean {
-  if (card.isSpecial) return false // specjalne grajesz bezpośrednio
+  if (card.isSpecial) return false
   const p = card.place
-  const row = rowIdx + 1 // backend: 1,2,3
+  const row = rowIdx + 1
   return (
     p === row ||
     (p === 12 && (row === 1 || row === 2)) ||
@@ -431,64 +467,33 @@ function canPlayInRow(card: GameCardType, rowIdx: number): boolean {
 
 function selectCard(card: GameCardType) {
   if (!signalRStore.myTurn) return
-
-  if (selectedCard.value?.id === card.id) {
-    selectedCard.value = null
-    return
-  }
-
+  if (selectedCard.value?.id === card.id) { selectedCard.value = null; return }
   selectedCard.value = card
-
-  // Karta specjalna — zagraj od razu (nie wymaga wyboru rzędu)
-  if (card.isSpecial) {
-    playCardDirectly(card)
-    return
-  }
-
-  // Karta z jednym możliwym rzędem — zagraj od razu
+  if (card.isSpecial) { playCardDirectly(card); return }
   const validRows = [0, 1, 2].filter(i => canPlayInRow(card, i))
-  if (validRows.length === 1 && card.ability !== 3 /* zwinność */) {
-    playInRow(card, validRows[0])
-    return
-  }
-
-  // Karta dowódcy — zagraj od razu
-  if (card.isCommander) {
-    playCardDirectly(card)
-    return
-  }
+  if (validRows.length === 1 && card.ability !== 3) { playInRow(card, validRows[0]); return }
+  if (card.isCommander) { playCardDirectly(card); return }
 }
 
 async function playInRow(card: GameCardType, rowIdx: number) {
   if (!signalRStore.myTurn || !card) return
   if (!canPlayInRow(card, rowIdx)) return
-
   selectedCard.value = null
   if (card.isCommander) commanderUsed.value = true
-
-  try {
-    await signalRStore.playCard(card, rowIdx + 1)
-  } catch (e) {
-    console.error('Błąd zagrania karty', e)
-  }
+  try { await signalRStore.playCard(card, rowIdx + 1) }
+  catch (e) { console.error('Błąd zagrania karty', e) }
 }
 
 async function playCardDirectly(card: GameCardType) {
   selectedCard.value = null
   if (card.isCommander) commanderUsed.value = true
-  try {
-    await signalRStore.playCard(card)
-  } catch (e) {
-    console.error('Błąd zagrania karty', e)
-  }
+  try { await signalRStore.playCard(card) }
+  catch (e) { console.error('Błąd zagrania karty', e) }
 }
 
 async function pass() {
-  try {
-    await signalRStore.playerPass()
-  } catch (e) {
-    console.error('Błąd pasowania', e)
-  }
+  try { await signalRStore.playerPass() }
+  catch (e) { console.error('Błąd pasowania', e) }
 }
 
 async function resolveAgility(row: number) {
@@ -511,7 +516,6 @@ onMounted(async () => {
     await router.push({ name: 'lobby' })
     return
   }
- 
   if (signalRStore.amIHost) {
     await new Promise(resolve => setTimeout(resolve, 500))
     await signalRStore.chooseFirstPlayer()
@@ -522,252 +526,503 @@ onUnmounted(async () => {
   await signalRStore.disconnect()
 })
 
-const myDeckCount = computed(() => {
-  if (!signalRStore.game) return 0
-  return signalRStore.amIPlayer1
-    ? (signalRStore.game.player1CardsInDeck?.length ?? 0)
-    : (signalRStore.game.player2CardsInDeck?.length ?? 0)
+watch(() => signalRStore.gameConnectionId, (newId) => {
+  console.log('gameConnectionId zmienione na:', newId)
 })
-
-const opponentDeckCount = computed(() => {
-  if (!signalRStore.game) return 0
-  return signalRStore.amIPlayer1
-    ? (signalRStore.game.player2CardsInDeck?.length ?? 0)
-    : (signalRStore.game.player1CardsInDeck?.length ?? 0)
-})
-
-const myGraveyardCount = computed(() => signalRStore.myGraveyard.length)
-
-const opponentGraveyardCount = computed(() => {
-  if (!signalRStore.game) return 0
-  return signalRStore.amIPlayer1
-    ? (signalRStore.game.player2CardsOnDisplay?.length ?? 0)  // tu może być problem
-    : (signalRStore.game.player1CardsOnDisplay?.length ?? 0)
-})
-
-// Dodatkowy computed – liczba kart przeciwnika na ręce (do ewentualnego debugu)
-const opponentHandCount = computed(() => {
-  if (!signalRStore.game) return 0
-  return signalRStore.amIPlayer1
-    ? (signalRStore.game.player2CardsOnHand?.length ?? 0)
-    : (signalRStore.game.player1CardsOnHand?.length ?? 0)
-})
-
-watch(
-  () => signalRStore.gameConnectionId,
-  (newId) => {
-    console.log('gameConnectionId zmienione na:', newId)
-  }
-)
 </script>
 
 <style scoped>
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  SZKIELET WIDOKU                                                   */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .game-view {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #0d1a0d;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(60, 90, 40, 0.5) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(20, 40, 15, 0.8) 0%, transparent 60%),
+    #0d1a0d;
   overflow: hidden;
   color: white;
+  font-family: 'Georgia', serif;
 }
 
-/* ─── Topbar ─── */
-.game-topbar {
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  GÓRA — pasek przeciwnika                                          */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+.opponent-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.5);
-  border-bottom: 1px solid rgba(255, 215, 64, 0.15);
+  gap: 12px;
+  padding: 6px 16px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%);
+  border-bottom: 1px solid rgba(255, 215, 64, 0.12);
   flex-shrink: 0;
-  height: 48px;
+  min-height: 110px;
 }
 
-.player-info {
+.opponent-commander-slot {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 72px;
 }
 
-.round-gems {
+.opponent-hand-area {
+  flex: 1;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
-.round-gem {
+.opponent-hand-cards {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 72px;
+  position: relative;
+}
+
+/* Rewers karty przeciwnika */
+.card-back {
+  width: 44px;
+  height: 64px;
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, #1a2a1a 0%, #0d1a0d 50%, #1a2a1a 100%);
+  border: 1px solid rgba(255, 215, 64, 0.25);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  position: absolute;
+  transition: transform 0.2s ease;
+  /* Wzór na rewersie */
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 215, 64, 0.05) 0px,
+      rgba(255, 215, 64, 0.05) 1px,
+      transparent 1px,
+      transparent 8px
+    );
+}
+
+.opponent-decks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  width: 72px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  ŚRODEK — lewa belka + plansza                                     */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+.game-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* LEWA BELKA */
+.side-panel {
+  width: 88px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(180deg,
+    rgba(0,0,0,0.6) 0%,
+    rgba(10,20,10,0.8) 50%,
+    rgba(0,0,0,0.6) 100%
+  );
+  border-right: 1px solid rgba(255, 215, 64, 0.1);
+  padding: 8px 4px;
+  gap: 0;
+}
+
+/* Score block */
+.score-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.score-block--opponent {
+  border-bottom: 1px solid rgba(255, 215, 64, 0.08);
+  padding-bottom: 12px;
+}
+
+.score-block--me {
+  border-top: 1px solid rgba(255, 215, 64, 0.08);
+  padding-top: 12px;
+}
+
+.score-value {
+  font-size: 2rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.25);
+  line-height: 1;
+  font-family: 'Georgia', serif;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.score-value--leading {
+  color: #ffd740;
+  text-shadow: 0 0 16px rgba(255, 215, 64, 0.5), 0 0 32px rgba(255, 215, 64, 0.2);
+}
+
+.score-sub {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.score-gems {
+  display: flex;
+  gap: 5px;
+}
+
+.score-gem {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
 }
 
-.round-gem--won {
-  background: #ffd740;
+.score-gem--won {
+  background: radial-gradient(circle at 30% 30%, #ffe066, #ffd740, #ffa000);
   border-color: #ffa000;
+  box-shadow: 0 0 8px rgba(255, 215, 64, 0.6);
 }
 
-.game-round-info {
+/* Sekcja pogody */
+.weather-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.weather-title {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.weather-icons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.weather-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 0.1rem;
+  justify-content: center;
+  border: 1px solid;
 }
 
-/* ─── Plansza ─── */
-.game-board {
+.weather-icon--frost {
+  background: rgba(100, 180, 255, 0.15);
+  border-color: rgba(100, 180, 255, 0.4);
+  color: #90caf9;
+}
+
+.weather-icon--fog {
+  background: rgba(150, 150, 200, 0.15);
+  border-color: rgba(150, 150, 200, 0.4);
+  color: #b0bec5;
+}
+
+.weather-icon--rain {
+  background: rgba(80, 140, 255, 0.15);
+  border-color: rgba(80, 140, 255, 0.4);
+  color: #64b5f6;
+}
+
+.weather-none {
+  opacity: 0.3;
+}
+
+/* Wskaźnik tury */
+.turn-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0,0,0,0.3);
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.55rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.turn-block--active {
+  color: #ffd740;
+  border-color: rgba(255, 215, 64, 0.3);
+  background: rgba(255, 215, 64, 0.08);
+  box-shadow: inset 0 0 12px rgba(255, 215, 64, 0.05);
+}
+
+.round-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.round-label-text {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.25);
+}
+
+.round-number {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: rgba(255, 215, 64, 0.6);
+  line-height: 1;
+}
+
+/* PLANSZA GRY */
+.board-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  padding: 4px 12px;
-  gap: 2px;
+  padding: 4px 8px;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 215, 64, 0.1) transparent;
 }
 
-.board-side {
+.board-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 0;
+}
+
+.board-divider {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-}
-
-.side-score {
-  min-width: 48px;
-  text-align: center;
   flex-shrink: 0;
 }
 
-.total-score {
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: rgba(255, 255, 255, 0.3);
-  line-height: 1;
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 64, 0.2), transparent);
 }
 
-.total-score--leading {
-  color: #ffd740;
-  text-shadow: 0 0 12px rgba(255, 215, 64, 0.4);
+.divider-ornament {
+  font-size: 1rem;
+  color: rgba(255, 215, 64, 0.3);
+  flex-shrink: 0;
 }
 
-.rows-stack {
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  DÓŁ — ręka gracza                                                 */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+.player-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 100%);
+  border-top: 1px solid rgba(255, 215, 64, 0.15);
+  flex-shrink: 0;
+  min-height: 120px;
+}
+
+.player-commander-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 72px;
+}
+
+.player-hand {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
-/* ─── Separator ─── */
-.board-separator {
+.hand-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(255, 215, 64, 0.1);
-  border-bottom: 1px solid rgba(255, 215, 64, 0.1);
-  flex-shrink: 0;
+  padding: 0 4px;
 }
 
-.turn-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.turn-indicator--my {
-  color: #ffd740;
-  font-weight: 700;
-}
-
-.weather-bar {
+.hand-actions {
   display: flex;
   gap: 6px;
 }
 
-.weather-chip {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(100, 180, 255, 0.15);
-  border: 1px solid rgba(100, 180, 255, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ─── Ręka gracza ─── */
-.player-hand-area {
-  background: rgba(0, 0, 0, 0.5);
-  border-top: 1px solid rgba(255, 215, 64, 0.15);
-  padding: 8px 12px;
-  flex-shrink: 0;
-}
-
-.hand-info {
-  margin-bottom: 6px;
-}
-
-.hand-cards {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  overflow: hidden;
-}
-
-.commander-slot {
-  flex-shrink: 0;
-}
-
-.commander-empty {
-  width: 64px;
-  height: 96px;
-  border-radius: 6px;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hand-divider {
-  width: 1px;
-  height: 80px;
-  background: rgba(255, 215, 64, 0.2);
-  flex-shrink: 0;
-}
-
-.hand-scroll {
+.hand-cards-scroll {
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  padding: 8px 4px 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 215, 64, 0.2) transparent;
+  padding: 4px 4px 0;
   align-items: flex-end;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 215, 64, 0.15) transparent;
 }
 
-.hand-scroll::-webkit-scrollbar {
-  height: 3px;
-}
-
-.hand-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 215, 64, 0.2);
+.hand-cards-scroll::-webkit-scrollbar { height: 3px; }
+.hand-cards-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 64, 0.15);
   border-radius: 2px;
 }
 
-.hand-actions {
-  margin-top: 8px;
+.player-decks {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  width: 72px;
 }
 
-/* ─── Loading ─── */
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  WSPÓLNE — talia, cmentarz, sloty                                  */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+.deck-pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+.deck-icon-stack {
+  position: relative;
+  width: 44px;
+  height: 60px;
+}
+
+.mini-card-back,
+.mini-card-stack {
+  position: absolute;
+  width: 44px;
+  height: 60px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 215, 64, 0.2);
+  background: linear-gradient(135deg, #1a2a1a, #0d1a0d);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 215, 64, 0.04) 0px,
+    rgba(255, 215, 64, 0.04) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+
+.mini-card-stack {
+  background: linear-gradient(135deg, #2a1a1a, #1a0d0d);
+  border-color: rgba(255, 100, 64, 0.2);
+}
+
+.deck-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  background: #0d1a0d;
+  color: #ffd740;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid #ffd740;
+  z-index: 10;
+}
+
+.graveyard-badge {
+  color: #ef9a9a;
+  border-color: #ef9a9a;
+}
+
+.slot-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+}
+
+.slot-name {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 72px;
+}
+
+.card-placeholder {
+  width: 52px;
+  height: 76px;
+  border-radius: 5px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.2);
+}
+
+.commander-card {
+  /* Lekkie podświetlenie dowódcy */
+  filter: drop-shadow(0 0 6px rgba(255, 215, 64, 0.2));
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  LOADING                                                           */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .game-loading {
   display: flex;
   flex-direction: column;
@@ -777,96 +1032,13 @@ watch(
   background: #0d1a0d;
 }
 
-/* ─── Dialogi ─── */
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  DIALOGI                                                           */
+/* ═══════════════════════════════════════════════════════════════════ */
+
 .gwint-dialog {
-  background: rgba(20, 20, 15, 0.95) !important;
+  background: rgba(15, 20, 12, 0.97) !important;
   border: 1px solid rgba(255, 215, 64, 0.2) !important;
-  backdrop-filter: blur(12px);
-}
-
-/* Deck info */
-.deck-info-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 8px;
-  gap: 12px;
-}
-
-.deck-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.6);
-}
-
-.deck-info--opponent {
-  flex-direction: row;
-}
-
-.deck-info--me {
-  flex-direction: row-reverse;
-}
-
-.deck-visual {
-  position: relative;
-  width: 52px;
-  height: 74px;
-}
-
-.deck-stack {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.deck-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 52px;
-  height: 74px;
-  background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
-  border: 2px solid #ffd74033;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.6);
-  z-index: 1;
-}
-
-.deck-count {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  background: #0d1a0d;
-  color: #ffd740;
-  font-size: 0.75rem;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 2px solid #ffd740;
-  z-index: 10;
-}
-
-.deck-label {
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.deck-label small {
-  color: rgba(255,255,255,0.4);
-  font-size: 0.7rem;
-}
-
-/* Dostosowanie hand-center */
-.hand-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  backdrop-filter: blur(16px);
 }
 </style>
