@@ -16,8 +16,8 @@ namespace Backend.Hubs
         private readonly GameUseCases gameUseCases;
         private readonly GwintDBContext gwintDBContext;
         private AbilityUseCases abilityUseCases;
-        public GameHub(GameUseCases gameUseCases, GwintDBContext gwintDBContext) 
-        { 
+        public GameHub(GameUseCases gameUseCases, GwintDBContext gwintDBContext)
+        {
             this.gameUseCases = gameUseCases;
             this.gwintDBContext = gwintDBContext;
             this.abilityUseCases = new AbilityUseCases();
@@ -135,7 +135,7 @@ namespace Backend.Hubs
 
             var player = game.CurrentPlayer;
 
-            if(game.CurrentPlayer == game.Player1)
+            if (game.CurrentPlayer == game.Player1)
             {
                 game.Player1Passed = true;
                 game.CurrentPlayer = game.Player2;
@@ -146,7 +146,7 @@ namespace Backend.Hubs
                 game.CurrentPlayer = game.Player1;
             }
 
-            if(game.Player1Passed == true &&  game.Player2Passed == true)
+            if (game.Player1Passed == true && game.Player2Passed == true)
             {
                 //Powinien byc tutaj reset rundy
             }
@@ -281,44 +281,61 @@ namespace Backend.Hubs
         {
             if (card.isCommander)
             {
-                return;
+                switch (card.ability)
+                {
+                    case Abilities.nilfgaard1: abilityUseCases.EmperorOfNilfgardAbility(game.CurrentPlayer == game.Player1? game.Player2CardsOnHand : game.Player1CardsOnHand); break;
+                    case Abilities.nilfgaard2: abilityUseCases.HisEmperialmajestyAbility(game); break;
+                    case Abilities.nilfgaard3: abilityUseCases.InvaiderOfTheNorthAbility(game, card); break;
+                    case Abilities.nilfgaard4: abilityUseCases.TheRelentlessAbility(game, card); break;
+                    case Abilities.nilfgaard5: abilityUseCases.TheWhiteFlameAbility(game); break;
+                    case Abilities.polnoc1: abilityUseCases.KingOfTemeriaAbility(game); break;
+                    case Abilities.polnoc2: abilityUseCases.CommanderOfTheNorthAbility(game); break;
+                    case Abilities.polnoc3: abilityUseCases.SonOfMedellAbility(game); break;
+                    case Abilities.polnoc4: abilityUseCases.TheSiegemasterAbility(game); break;
+                    case Abilities.polnoc5: abilityUseCases.TheSteelForged(game); break;
+
+                }
+            }
+            else
+            {
+                switch (card.ability)
+                {
+                    case Abilities.trzaskajacyMroz: abilityUseCases.TrzaskajacyMrozAbility(game); break;
+                    case Abilities.gestaMgla: abilityUseCases.GestaMglaAbility(game); break;
+                    case Abilities.ulewnyDeszcz: abilityUseCases.UlewnyDeszczAbility(game); break;
+                    case Abilities.czysteNiebo: abilityUseCases.CzysteNieboAbility(game); break;
+                    case Abilities.pozoga: abilityUseCases.Pozoga(game); break;
+                    case Abilities.manekinDoCwiczen:
+                        await Clients.Caller.SendAsync("SelectCardToDecoy", card.Id);
+                        break;
+                    case Abilities.wskrzeszenie:
+                        if (HasRevivableCards(game))
+                            await Clients.Caller.SendAsync("RequestResurrectionTarget");
+                        break;
+                    case Abilities.zwinnośc:
+                        if (selectedRow == null)
+                            await Clients.Caller.SendAsync("RequestAgilityRow", card.Id);
+                        else
+                            abilityUseCases.ZwinnoscAbility(game, card, (int)selectedRow);
+                        break;
+                    case Abilities.szpieg:
+                        abilityUseCases.SzpiegAbility(game, card);
+                        break;
+                    case Abilities.braterstwo:
+                        abilityUseCases.BraterstwoAbility(game, card);
+                        break;
+                    case Abilities.pozogaJednostki:
+                        abilityUseCases.PozogaJednostkiAbility(game, card);
+                        break;
+                    default:
+                        // Dla pasywnych skilli jak Więź czy Morale
+                        abilityUseCases.WiezAbility(game);
+                        abilityUseCases.WyzszeMoraleAbility(game);
+                        break;
+                }
+
             }
 
-            switch (card.ability)
-            {
-                case Abilities.trzaskajacyMroz: abilityUseCases.TrzaskajacyMrozAbility(game); break;
-                case Abilities.gestaMgla: abilityUseCases.GestaMglaAbility(game); break;
-                case Abilities.ulewnyDeszcz: abilityUseCases.UlewnyDeszczAbility(game); break;
-                case Abilities.czysteNiebo: abilityUseCases.CzysteNieboAbility(game); break;
-                case Abilities.pozoga: abilityUseCases.Pozoga(game); break;
-                case Abilities.manekinDoCwiczen:
-                    await Clients.Caller.SendAsync("SelectCardToDecoy", card.Id);
-                    break;
-                case Abilities.wskrzeszenie:
-                    if (HasRevivableCards(game))
-                        await Clients.Caller.SendAsync("RequestResurrectionTarget");
-                    break;
-                case Abilities.zwinnośc:
-                    if (selectedRow == null)
-                        await Clients.Caller.SendAsync("RequestAgilityRow", card.Id);
-                    else
-                        abilityUseCases.ZwinnoscAbility(game, card, (int)selectedRow);
-                    break;
-                case Abilities.szpieg:
-                    abilityUseCases.SzpiegAbility(game, card);
-                    break;
-                case Abilities.braterstwo:
-                    abilityUseCases.BraterstwoAbility(game, card);
-                    break;
-                case Abilities.pozogaJednostki:
-                    abilityUseCases.PozogaJednostkiAbility(game, card);
-                    break;
-                default:
-                    // Dla pasywnych skilli jak Więź czy Morale
-                    abilityUseCases.WiezAbility(game);
-                    abilityUseCases.WyzszeMoraleAbility(game);
-                    break;
-            }
         }
     }
-}
+} 
