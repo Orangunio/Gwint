@@ -58,17 +58,17 @@ export interface GameState {
   player2RoundsWon: number
 }
 
+export type GameResult = 'win' | 'lose' | 'draw' | null
+
 interface SignalRState {
   roomConnection: signalR.HubConnection | null
   gameConnection: signalR.HubConnection | null
-  // NAPRAWKA: osobne connectionId dla room i game hub
   roomConnectionId: string | null
   gameConnectionId: string | null
 
   roomId: string | null
   roomPlayers: string[]
   isRoomReady: boolean
-  // NAPRAWKA: flaga czy jesteśmy hostem (stworzył pokój)
   isHost: boolean
 
   game: GameState | null
@@ -79,6 +79,9 @@ interface SignalRState {
   selectedFraction: number | null
   opponentSelectedFraction: number | null
   bothFractionsSelected: boolean
+
+  gameResult: GameResult
+  gameResultWinner: string | null
 
   isConnecting: boolean
   error: string | null
@@ -104,6 +107,9 @@ export const useSignalRStore = defineStore('signalr', {
     selectedFraction: null,
     opponentSelectedFraction: null,
     bothFractionsSelected: false,
+
+    gameResult: null,
+    gameResultWinner: null,
 
     isConnecting: false,
     error: null,
@@ -208,7 +214,6 @@ export const useSignalRStore = defineStore('signalr', {
       const roomId = await this.roomConnection.invoke<string>('CreateRoom', playerName)
       this.roomId = roomId
       this.roomPlayers = [playerName]
-      // NAPRAWKA: jeśli tworzymy pokój — jesteśmy hostem
       this.isHost = true
       return roomId
     },
@@ -218,7 +223,6 @@ export const useSignalRStore = defineStore('signalr', {
 
       await this.roomConnection.invoke('JoinRoom', roomId, playerName)
       this.roomId = roomId
-      // NAPRAWKA: jeśli dołączamy — nie jesteśmy hostem
       this.isHost = false
     },
 
@@ -243,7 +247,6 @@ export const useSignalRStore = defineStore('signalr', {
         this.gameConnectionId = conn.connectionId
 
         if (this.roomId) {
-          // Przekaż roomConnectionId żeby backend zmapował gracza
           await conn.invoke('JoinGameRoom', this.roomId, this.roomConnectionId)
         }
 
@@ -256,26 +259,49 @@ export const useSignalRStore = defineStore('signalr', {
     setupGameListeners(conn: signalR.HubConnection) {
       conn.on('GameStarted', (game: GameState) => {
         console.log('GameStarted, mój connectionId:', this.gameConnectionId)
-        this.game = JSON.parse(JSON.stringify(game))  // głęboka kopia = pełna reaktywność
+        this.game = JSON.parse(JSON.stringify(game))
         this.myTurn = false
         this.pendingAction = null
         this.pendingCardId = null
+        this.gameResult = null
+        this.gameResultWinner = null
       })
 
       conn.on('GameStateUpdated', (game: GameState) => {
-        this.game = JSON.parse(JSON.stringify(game))  // głęboka kopia
+        this.game = JSON.parse(JSON.stringify(game))
       })
 
       conn.on('TurnStarted', (connectionId: string) => {
-        this.myTurn = connectionId === this.roomConnectionId  // ← zmiana
+        this.myTurn = connectionId === this.roomConnectionId
         this.pendingAction = null
         this.pendingCardId = null
       })
 
       conn.on('NextTurn', (connectionId: string) => {
-        this.myTurn = connectionId === this.roomConnectionId  // ← zmiana
+        this.myTurn = connectionId === this.roomConnectionId
         this.pendingAction = null
         this.pendingCardId = null
+      })
+
+      conn.on('RoundStarted', ({ game, currentPlayerId }) => {
+        this.game = game
+        this.myTurn = currentPlayerId === this.roomConnectionId
+      })
+
+      conn.on('Player1WonGame', (game: GameState) => {
+        this.game = JSON.parse(JSON.stringify(game))
+        this.myTurn = false
+        const isPlayer1 = game.player1?.connectionId === this.roomConnectionId
+        this.gameResult = isPlayer1 ? 'win' : 'lose'
+        this.gameResultWinner = game.player1?.login ?? 'Gracz 1'
+      })
+
+      conn.on('Player2WonGame', (game: GameState) => {
+        this.game = JSON.parse(JSON.stringify(game))
+        this.myTurn = false
+        const isPlayer2 = game.player2?.connectionId === this.roomConnectionId
+        this.gameResult = isPlayer2 ? 'win' : 'lose'
+        this.gameResultWinner = game.player2?.login ?? 'Gracz 2'
       })
 
       conn.on('ScoiataelChooseFirstPlayer', () => {
@@ -342,6 +368,11 @@ export const useSignalRStore = defineStore('signalr', {
       this.pendingAction = null
     },
 
+    clearGameResult() {
+      this.gameResult = null
+      this.gameResultWinner = null
+    },
+
     async disconnect() {
       await this.roomConnection?.stop()
       await this.gameConnection?.stop()
@@ -355,6 +386,8 @@ export const useSignalRStore = defineStore('signalr', {
       this.isRoomReady = false
       this.isHost = false
       this.myTurn = false
+      this.gameResult = null
+      this.gameResultWinner = null
     },
   },
 })

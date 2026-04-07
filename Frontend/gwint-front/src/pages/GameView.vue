@@ -67,12 +67,26 @@
         <!-- LEWA BELKA — score, rundy, pogoda -->
         <div class="side-panel">
 
-          <!-- Wynik i rundy przeciwnika -->
-          <div class="score-block score-block--opponent">
-            <div class="score-gems">
-              <div v-for="i in 2" :key="i"
-                class="score-gem" :class="{ 'score-gem--won': opponentRoundsWon >= i }" />
+          <!-- Rundy przeciwnika -->
+          <div class="rounds-block rounds-block--opponent">
+            <div class="rounds-label">Rundy</div>
+            <div class="rounds-gems">
+              <div
+                v-for="i in 2"
+                :key="i"
+                class="round-gem"
+                :class="{
+                  'round-gem--won': opponentRoundsWon >= i,
+                  'round-gem--pulse': opponentRoundsWon === i
+                }"
+              >
+                <span v-if="opponentRoundsWon >= i" class="round-gem-icon">✦</span>
+              </div>
             </div>
+          </div>
+
+          <!-- Wynik przeciwnika -->
+          <div class="score-block score-block--opponent">
             <div class="score-value" :class="{ 'score-value--leading': opponentLeading }">
               {{ opponentTotal }}
             </div>
@@ -117,16 +131,30 @@
             </div>
           </div>
 
-          <!-- Wynik i rundy gracza -->
+          <!-- Wynik gracza -->
           <div class="score-block score-block--me">
             <div class="score-value" :class="{ 'score-value--leading': myLeading }">
               {{ myTotal }}
             </div>
             <div class="score-sub">pkt</div>
-            <div class="score-gems">
-              <div v-for="i in 2" :key="i"
-                class="score-gem" :class="{ 'score-gem--won': myRoundsWon >= i }" />
+          </div>
+
+          <!-- Rundy gracza -->
+          <div class="rounds-block rounds-block--me">
+            <div class="rounds-gems">
+              <div
+                v-for="i in 2"
+                :key="i"
+                class="round-gem"
+                :class="{
+                  'round-gem--won': myRoundsWon >= i,
+                  'round-gem--pulse': myRoundsWon === i
+                }"
+              >
+                <span v-if="myRoundsWon >= i" class="round-gem-icon">✦</span>
+              </div>
             </div>
+            <div class="rounds-label">Rundy</div>
           </div>
         </div>
 
@@ -321,18 +349,111 @@
 
     </template>
 
-    <!-- Debug overlay -->
-    <!-- <div style="position:fixed;top:0;left:0;z-index:9999;background:black;color:lime;font-size:11px;padding:8px;max-width:400px;max-height:300px;overflow:auto">
-      <div>isGameConnected: {{ signalRStore.isGameConnected }}</div>
-      <div>gameConnectionId: {{ signalRStore.gameConnectionId }}</div>
-      <div>game is null: {{ signalRStore.game === null }}</div>
-      <div>game.player1: {{ signalRStore.game?.player1?.connectionId }}</div>
-      <div>game.player2: {{ signalRStore.game?.player2?.connectionId }}</div>
-      <div>amIPlayer1: {{ signalRStore.amIPlayer1 }}</div>
-      <div>amIHost: {{ signalRStore.amIHost }}</div>
-      <div>myTurn: {{ signalRStore.myTurn }}</div>
-      <div>myHand.length: {{ signalRStore.myHand.length }}</div>
-    </div> -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- OVERLAY: Koniec gry                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <Transition name="result-overlay">
+      <div v-if="signalRStore.gameResult" class="result-overlay">
+        <!-- Tło z efektem -->
+        <div class="result-bg" :class="`result-bg--${signalRStore.gameResult}`" />
+        <div class="result-particles">
+          <div v-for="i in 20" :key="i" class="result-particle"
+            :style="{
+              '--x': `${Math.random() * 100}%`,
+              '--delay': `${Math.random() * 2}s`,
+              '--duration': `${2 + Math.random() * 2}s`,
+              '--size': `${4 + Math.random() * 8}px`
+            }"
+          />
+        </div>
+
+        <!-- Karta wyniku -->
+        <div class="result-card" :class="`result-card--${signalRStore.gameResult}`">
+          <!-- Ikona -->
+          <div class="result-icon-wrap">
+            <div class="result-icon" :class="`result-icon--${signalRStore.gameResult}`">
+              <v-icon
+                :icon="signalRStore.gameResult === 'win' ? 'mdi-crown' : 'mdi-skull-crossbones'"
+                size="56"
+              />
+            </div>
+          </div>
+
+          <!-- Tytuł -->
+          <div class="result-title" :class="`result-title--${signalRStore.gameResult}`">
+            <template v-if="signalRStore.gameResult === 'win'">
+              Zwycięstwo!
+            </template>
+            <template v-else-if="signalRStore.gameResult === 'lose'">
+              Porażka
+            </template>
+            <template v-else>
+              Remis
+            </template>
+          </div>
+
+          <!-- Zwycięzca -->
+          <div class="result-winner">
+            <template v-if="signalRStore.gameResult === 'win'">
+              Gratulacje, <strong>{{ signalRStore.myPlayer?.login }}</strong>!
+            </template>
+            <template v-else-if="signalRStore.gameResult === 'lose'">
+              Gracz <strong>{{ signalRStore.gameResultWinner }}</strong> wygrał tę potyczkę.
+            </template>
+            <template v-else>
+              Żaden z graczy nie wygrał.
+            </template>
+          </div>
+
+          <!-- Wyniki rund -->
+          <div class="result-rounds">
+            <div class="result-rounds-title">Wynik rund</div>
+            <div class="result-rounds-row">
+              <span class="result-rounds-name">{{ signalRStore.myPlayer?.login ?? 'Ty' }}</span>
+              <div class="result-rounds-gems">
+                <div
+                  v-for="i in 2"
+                  :key="i"
+                  class="result-gem"
+                  :class="{ 'result-gem--won': myRoundsWon >= i }"
+                >
+                  <span v-if="myRoundsWon >= i">✦</span>
+                </div>
+              </div>
+              <span class="result-rounds-score">{{ myRoundsWon }} / 2</span>
+            </div>
+            <div class="result-rounds-row">
+              <span class="result-rounds-name">{{ signalRStore.opponentPlayer?.login ?? 'Przeciwnik' }}</span>
+              <div class="result-rounds-gems">
+                <div
+                  v-for="i in 2"
+                  :key="i"
+                  class="result-gem"
+                  :class="{ 'result-gem--won': opponentRoundsWon >= i }"
+                >
+                  <span v-if="opponentRoundsWon >= i">✦</span>
+                </div>
+              </div>
+              <span class="result-rounds-score">{{ opponentRoundsWon }} / 2</span>
+            </div>
+          </div>
+
+          <!-- Przyciski -->
+          <div class="result-actions">
+            <v-btn
+              color="amber-darken-2"
+              size="large"
+              variant="elevated"
+              prepend-icon="mdi-home"
+              @click="goToLobby"
+            >
+              Wróć do lobby
+            </v-btn>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
@@ -357,7 +478,6 @@ const currentRound = ref(1)
 const board = computed(() => signalRStore.game?.board)
 const amIP1 = computed(() => signalRStore.amIPlayer1)
 
-// Dowódca przeciwnika — zakładamy że store ma opponentCommander lub wyciągamy z game
 const opponentCommander = computed(() => {
   if (!signalRStore.game) return null
   return amIP1.value
@@ -448,6 +568,11 @@ const opponentHandCount = computed(() => {
     : (signalRStore.game.player1CardsOnHand?.length ?? 0)
 })
 
+// Aktualizuj numer rundy na podstawie wygranych rund
+watch([myRoundsWon, opponentRoundsWon], () => {
+  currentRound.value = myRoundsWon.value + opponentRoundsWon.value + 1
+}, { immediate: true })
+
 // ─── LOGIKA PLACE ───────────────────────────────────────────────────
 
 function canPlayInRow(card: GameCardType, rowIdx: number): boolean {
@@ -507,6 +632,12 @@ async function resolveResurrection(card: GameCardType) {
 
 async function resolveDecoy(card: GameCardType) {
   await signalRStore.resolveDecoy(card.id)
+}
+
+async function goToLobby() {
+  signalRStore.clearGameResult()
+  await signalRStore.disconnect()
+  await router.push({ name: 'lobby' })
 }
 
 // ─── LIFECYCLE ──────────────────────────────────────────────────────
@@ -589,7 +720,6 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
   position: relative;
 }
 
-/* Rewers karty przeciwnika */
 .card-back {
   width: 44px;
   height: 64px;
@@ -600,7 +730,6 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   position: absolute;
   transition: transform 0.2s ease;
-  /* Wzór na rewersie */
   background-image:
     repeating-linear-gradient(
       45deg,
@@ -648,24 +777,84 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
   gap: 0;
 }
 
+/* ─── RUNDY ─────────────────────────────────────────────────────── */
+
+.rounds-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 0;
+  width: 100%;
+}
+
+.rounds-block--opponent {
+  border-bottom: 1px solid rgba(255, 215, 64, 0.08);
+}
+
+.rounds-block--me {
+  border-top: 1px solid rgba(255, 215, 64, 0.08);
+}
+
+.rounds-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.rounds-gems {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.round-gem {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.4s ease;
+  font-size: 0.65rem;
+  color: transparent;
+}
+
+.round-gem--won {
+  background: radial-gradient(circle at 35% 35%, #ffe066, #ffd740, #e65100);
+  border-color: #ffa000;
+  box-shadow:
+    0 0 10px rgba(255, 215, 64, 0.7),
+    0 0 24px rgba(255, 160, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.round-gem--pulse {
+  animation: gemPulse 1.2s ease-out;
+}
+
+@keyframes gemPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 215, 64, 0.9), 0 0 10px rgba(255, 215, 64, 0.7); }
+  50%  { box-shadow: 0 0 0 12px rgba(255, 215, 64, 0), 0 0 24px rgba(255, 160, 0, 0.4); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 215, 64, 0), 0 0 10px rgba(255, 215, 64, 0.7); }
+}
+
+.round-gem-icon {
+  line-height: 1;
+}
+
 /* Score block */
 .score-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 0;
+  gap: 2px;
+  padding: 6px 0;
   width: 100%;
-}
-
-.score-block--opponent {
-  border-bottom: 1px solid rgba(255, 215, 64, 0.08);
-  padding-bottom: 12px;
-}
-
-.score-block--me {
-  border-top: 1px solid rgba(255, 215, 64, 0.08);
-  padding-top: 12px;
 }
 
 .score-value {
@@ -687,26 +876,6 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
   color: rgba(255, 255, 255, 0.3);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-}
-
-.score-gems {
-  display: flex;
-  gap: 5px;
-}
-
-.score-gem {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.3s ease;
-}
-
-.score-gem--won {
-  background: radial-gradient(circle at 30% 30%, #ffe066, #ffd740, #ffa000);
-  border-color: #ffa000;
-  box-shadow: 0 0 8px rgba(255, 215, 64, 0.6);
 }
 
 /* Sekcja pogody */
@@ -1015,7 +1184,6 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
 }
 
 .commander-card {
-  /* Lekkie podświetlenie dowódcy */
   filter: drop-shadow(0 0 6px rgba(255, 215, 64, 0.2));
 }
 
@@ -1040,5 +1208,285 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
   background: rgba(15, 20, 12, 0.97) !important;
   border: 1px solid rgba(255, 215, 64, 0.2) !important;
   backdrop-filter: blur(16px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  OVERLAY: KONIEC GRY                                               */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Tło */
+.result-bg {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(6px);
+}
+
+.result-bg--win {
+  background: radial-gradient(ellipse at 50% 40%, rgba(255, 215, 64, 0.18) 0%, rgba(0,0,0,0.82) 70%);
+}
+
+.result-bg--lose {
+  background: radial-gradient(ellipse at 50% 40%, rgba(120, 0, 0, 0.25) 0%, rgba(0,0,0,0.88) 70%);
+}
+
+.result-bg--draw {
+  background: radial-gradient(ellipse at 50% 40%, rgba(80, 80, 180, 0.2) 0%, rgba(0,0,0,0.85) 70%);
+}
+
+/* Cząsteczki dekoracyjne (tylko przy wygranej) */
+.result-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.result-particle {
+  position: absolute;
+  left: var(--x);
+  bottom: -10px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffd740, #ffa000);
+  opacity: 0;
+  animation: particleFloat var(--duration) var(--delay) ease-out infinite;
+}
+
+@keyframes particleFloat {
+  0%   { transform: translateY(0) scale(1); opacity: 0.8; }
+  100% { transform: translateY(-100vh) scale(0.2); opacity: 0; }
+}
+
+/* Karta wyniku */
+.result-card {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 40px 48px;
+  border-radius: 20px;
+  min-width: 380px;
+  max-width: 480px;
+  animation: resultCardIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes resultCardIn {
+  from { transform: scale(0.7) translateY(40px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.result-card--win {
+  background: linear-gradient(160deg,
+    rgba(20, 16, 4, 0.97) 0%,
+    rgba(30, 22, 5, 0.97) 100%
+  );
+  border: 1.5px solid rgba(255, 215, 64, 0.35);
+  box-shadow:
+    0 0 60px rgba(255, 215, 64, 0.12),
+    0 0 120px rgba(255, 160, 0, 0.06),
+    inset 0 1px 0 rgba(255, 215, 64, 0.12);
+}
+
+.result-card--lose {
+  background: linear-gradient(160deg,
+    rgba(10, 4, 4, 0.97) 0%,
+    rgba(18, 6, 6, 0.97) 100%
+  );
+  border: 1.5px solid rgba(180, 30, 30, 0.3);
+  box-shadow:
+    0 0 60px rgba(180, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 80, 80, 0.08);
+}
+
+.result-card--draw {
+  background: rgba(14, 14, 24, 0.97);
+  border: 1.5px solid rgba(120, 120, 200, 0.25);
+  box-shadow: 0 0 60px rgba(100, 100, 200, 0.08);
+}
+
+/* Ikona */
+.result-icon-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.result-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-icon--win {
+  background: radial-gradient(circle at 35% 35%, #ffe066, #ffd740, #e65100);
+  box-shadow:
+    0 0 32px rgba(255, 215, 64, 0.5),
+    0 0 64px rgba(255, 160, 0, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  color: rgba(0, 0, 0, 0.7);
+  animation: iconGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes iconGlow {
+  from { box-shadow: 0 0 32px rgba(255, 215, 64, 0.5), 0 0 64px rgba(255, 160, 0, 0.25); }
+  to   { box-shadow: 0 0 48px rgba(255, 215, 64, 0.8), 0 0 96px rgba(255, 160, 0, 0.4); }
+}
+
+.result-icon--lose {
+  background: radial-gradient(circle at 35% 35%, #5a0000, #3a0000);
+  border: 2px solid rgba(180, 30, 30, 0.4);
+  box-shadow: 0 0 32px rgba(180, 0, 0, 0.3);
+  color: #ef9a9a;
+}
+
+.result-icon--draw {
+  background: radial-gradient(circle at 35% 35%, #2a2a5a, #1a1a3a);
+  border: 2px solid rgba(100, 100, 200, 0.4);
+  color: #90caf9;
+}
+
+/* Tytuł */
+.result-title {
+  font-size: 2.8rem;
+  font-weight: 900;
+  font-family: 'Georgia', serif;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-align: center;
+}
+
+.result-title--win {
+  background: linear-gradient(135deg, #ffe066, #ffd740, #ffa000);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 0 20px rgba(255, 215, 64, 0.4));
+}
+
+.result-title--lose {
+  color: rgba(200, 80, 80, 0.9);
+}
+
+.result-title--draw {
+  color: rgba(150, 150, 220, 0.9);
+}
+
+/* Zwycięzca */
+.result-winner {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.result-winner strong {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Wyniki rund */
+.result-rounds {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-rounds-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.result-rounds-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-rounds-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-rounds-gems {
+  display: flex;
+  gap: 6px;
+}
+
+.result-gem {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: transparent;
+  transition: all 0.3s ease;
+}
+
+.result-gem--won {
+  background: radial-gradient(circle at 35% 35%, #ffe066, #ffd740, #e65100);
+  border-color: #ffa000;
+  box-shadow: 0 0 10px rgba(255, 215, 64, 0.5);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.result-rounds-score {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 215, 64, 0.7);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Akcje */
+.result-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* ─── TRANSITION ─────────────────────────────────────────────────── */
+
+.result-overlay-enter-active {
+  transition: opacity 0.35s ease;
+}
+.result-overlay-leave-active {
+  transition: opacity 0.2s ease;
+}
+.result-overlay-enter-from,
+.result-overlay-leave-to {
+  opacity: 0;
 }
 </style>
