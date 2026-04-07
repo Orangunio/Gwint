@@ -148,7 +148,7 @@ namespace Backend.Hubs
 
             if (game.Player1Passed == true && game.Player2Passed == true)
             {
-                //Powinien byc tutaj reset rundy
+                await StartNewRound(roomId);
             }
             else
             {
@@ -157,6 +157,109 @@ namespace Backend.Hubs
             }
 
             await SendGameStateToAll(roomId, game);
+        }
+
+        public async Task StartNewRound(string roomId)
+        {
+            var game = gameUseCases.games[roomId];
+
+            if (game.Player1Score > game.Player2Score)
+            {
+                game.Player1RoundsWon++;
+                game.CurrentPlayer = game.Player1;
+                //Pasywka polnocy
+                if(game.Player1SelectedFraction == Fractions.NorthernRealms)
+                {
+                    if (game.Player1CardsInDeck.Any())
+                    {
+                        var card = game.Player1CardsInDeck[0];
+                        game.Player1CardsOnHand.Add(card);
+                        game.Player1CardsInDeck.RemoveAt(0);
+                    }
+                }
+            }
+            else if (game.Player1Score < game.Player2Score)
+            {
+                game.Player2RoundsWon++;
+                game.CurrentPlayer = game.Player2;
+                //pasywka polnocy
+                if (game.Player2SelectedFraction == Fractions.NorthernRealms)
+                {
+                    if (game.Player2CardsInDeck.Any())
+                    {
+                        var card = game.Player2CardsInDeck[0];
+                        game.Player2CardsOnHand.Add(card);
+                        game.Player2CardsInDeck.RemoveAt(0);
+                    }
+                }
+            }
+            else
+            {
+                //pasywka nilfgardu
+                if(game.Player1SelectedFraction == Fractions.Nilfgaard)
+                {
+                    game.Player1RoundsWon++;
+                }
+                else if (game.Player2SelectedFraction == Fractions.Nilfgaard)
+                {
+                    game.Player2RoundsWon++;
+                }
+                else
+                {
+                    game.Player1RoundsWon++;
+                    game.Player2RoundsWon++;
+                }
+            }
+
+            if(game.Player1RoundsWon == 2)
+            {
+                await Clients.Group(roomId)
+                    .SendAsync("Player1WonGame", game);
+                return;
+            }
+            else if (game.Player2RoundsWon == 2)
+            {
+                await Clients.Group(roomId)
+                    .SendAsync("Player2WonGame", game);
+                return;
+            }
+            else
+            {
+                MoveRowOnDisplay(game.Board.Player1FirstCardRow, game.Player1CardsOnDisplay);
+                MoveRowOnDisplay(game.Board.Player2FirstCardRow, game.Player2CardsOnDisplay);
+                MoveRowOnDisplay(game.Board.Player1SecondCardRow, game.Player1CardsOnDisplay);
+                MoveRowOnDisplay(game.Board.Player2SecondCardRow, game.Player2CardsOnDisplay);
+                MoveRowOnDisplay(game.Board.Player1ThirdCardRow, game.Player1CardsOnDisplay);
+                MoveRowOnDisplay(game.Board.Player2ThirdCardRow, game.Player2CardsOnDisplay);
+
+                game.Player1Passed = false;
+                game.Player2Passed = false;
+
+                game.Player1Score = 0;
+                game.Player2Score = 0;
+
+                game.Board.FrostActive = false;
+                game.Board.FogActive = false;
+                game.Board.RainActive = false;
+
+                for(int i=0; i< 3; i++)
+                {
+                    game.Board.RogDowodcyActive[0][i] = false;
+                    game.Board.RogDowodcyActive[1][i] = false;
+                }
+
+                await Clients.Group(roomId).SendAsync("RoundStarted", new
+                {
+                    game,
+                    currentPlayerId = game.CurrentPlayer.ConnectionId
+                });
+            }
+        }
+
+        public void MoveRowOnDisplay(List<Card> row, List<Card> display)
+        {
+            display.AddRange(row);
+            row.Clear();
         }
 
         public async Task ChooseFirstPlayer(string roomId)
@@ -213,6 +316,8 @@ namespace Backend.Hubs
         }
         private async Task FinishTurn(string roomId, Game game)
         {
+            UpdateCardsFinalStrength(game);
+
             game.Board.CalculateRowScores();
             if (game.CurrentPlayer == game.Player1)
             {
@@ -226,6 +331,21 @@ namespace Backend.Hubs
             await Clients.Group(roomId).SendAsync("NextTurn", game.CurrentPlayer.ConnectionId);
             await SendGameStateToAll(roomId, game);
         }
+
+        private static void UpdateCardsFinalStrength(Game game)
+        {
+            game.Board.CalculateRow(game.Board.Player1FirstCardRow, game.Board.FrostActive, game.Board.RogDowodcyActive[0][0]);
+            game.Board.CalculateRow(game.Board.Player1SecondCardRow, game.Board.FogActive, game.Board.RogDowodcyActive[0][1]);
+            game.Board.CalculateRow(game.Board.Player1ThirdCardRow, game.Board.RainActive, game.Board.RogDowodcyActive[0][2]);
+
+            game.Board.CalculateRow(game.Board.Player2FirstCardRow, game.Board.FrostActive, game.Board.RogDowodcyActive[1][0]);
+            game.Board.CalculateRow(game.Board.Player2SecondCardRow, game.Board.FogActive, game.Board.RogDowodcyActive[1][1]);
+            game.Board.CalculateRow(game.Board.Player2ThirdCardRow, game.Board.RainActive, game.Board.RogDowodcyActive[1][2]);
+
+            game.Player1Score = game.Board.GetPlayerTotalScore(true);
+            game.Player2Score = game.Board.GetPlayerTotalScore(false);
+        }
+
         private bool HasRevivableCards(Game game)
         {
             var graveyard = game.CurrentPlayer == game.Player1 ? game.Player1CardsOnDisplay : game.Player2CardsOnDisplay;

@@ -98,7 +98,7 @@ namespace Backend.Models
             return totalScore;
         }
 
-        public void CalculateRow(List<Card> row, bool frost, bool horn)
+        public void CalculateRow(List<Card> row, bool weather, bool horn)
         {
             if (row == null || row.Count == 0)
                 return;
@@ -110,7 +110,7 @@ namespace Backend.Models
             }
 
             // 2. Pogoda
-            if (frost)
+            if (weather)
             {
                 foreach (var card in row)
                 {
