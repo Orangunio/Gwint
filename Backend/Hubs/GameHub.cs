@@ -291,10 +291,40 @@ namespace Backend.Hubs
                 || game.Player2CommanderCard?.ability == Abilities.nilfgaard3;
         }
 
+        private bool CanUseCommander(Game game, Player currentPlayer)
+        {
+            var playerCommander = currentPlayer == game.Player1
+                ? game.Player1CommanderCard
+                : game.Player2CommanderCard;
+
+            var opponentCommander = currentPlayer == game.Player1
+                ? game.Player2CommanderCard
+                : game.Player1CommanderCard;
+
+            // ID 11 – blokuje wszystkich
+            if (game.Player1CommanderCard?.Id == 11 || game.Player2CommanderCard?.Id == 11)
+                return false;
+
+            // ID 9 – blokuje tylko właściciela
+            if (playerCommander?.Id == 9)
+                return false;
+
+            return true;
+        }
+
         public async Task PlayCard(string roomId, Card selectedCardByUser, int? selectedRow = null)
         {
             if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
             var currentPlayer = game.CurrentPlayer;
+
+            if (selectedCardByUser.isCommander)
+            {
+                if (!CanUseCommander(game, currentPlayer))
+                {
+                    await Clients.Caller.SendAsync("Error", "Nie możesz użyć tej zdolności dowódcy.");
+                    return;
+                }
+            }
 
             var playerHand = currentPlayer == game.Player1 ? game.Player1CardsOnHand : game.Player2CardsOnHand;
             var cardInHand = playerHand.FirstOrDefault(c => c.Id == selectedCardByUser.Id);
@@ -317,7 +347,8 @@ namespace Backend.Hubs
                 (selectedCardByUser.ability == Abilities.wskrzeszenie && HasRevivableCards(game) && !HasRandomResurrectionPassive(game)) ||
                 (selectedCardByUser.ability == Abilities.zwinnośc && selectedRow == null) ||
                 (selectedCardByUser.ability == Abilities.rogDowodcy && selectedRow == null) ||
-                (selectedCardByUser.isCommander && selectedCardByUser.ability == Abilities.nilfgaard1);
+                (selectedCardByUser.isCommander && selectedCardByUser.ability == Abilities.nilfgaard1)
+                 || (selectedCardByUser.isCommander && selectedCardByUser.ability == Abilities.nilfgaard4);
 
             if (!needsInteraction)
             {
@@ -428,10 +459,47 @@ namespace Backend.Hubs
             await FinishTurn(roomId, game);
         }
 
+        public async Task ResolveOpponentResurrection(string roomId, int cardId)
+        {
+            if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
+
+            var opponentGraveyard = game.CurrentPlayer == game.Player1
+                ? game.Player2CardsOnDisplay
+                : game.Player1CardsOnDisplay;
+
+            var card = opponentGraveyard.FirstOrDefault(c => c.Id == cardId);
+
+            if (card == null) return;
+
+            opponentGraveyard.Remove(card);
+
+            if (card.ability != Abilities.zwinnośc && card.ability != Abilities.szpieg)
+            {
+                if (game.CurrentPlayer == game.Player1)
+                {
+                    game.Player1CardsOnHand.Add(card);
+                }
+                else
+                {
+                    game.Player2CardsOnHand.Add(card);
+                }
+            }
+
+            await ExecuteCardAbility(roomId, game, card);
+
+            await FinishTurn(roomId, game);
+        }
+
         private async Task ExecuteCardAbility(string roomId, Game game, Card card, int? selectedRow = null)
         {
             if (card.isCommander)
             {
+                if (!CanUseCommander(game, game.CurrentPlayer))
+                {
+                    await Clients.Caller.SendAsync("Error", "Dowódcy są zablokowani.");
+                    return;
+                }
+
                 switch (card.ability)
                 {
                     case Abilities.nilfgaard1:
@@ -445,7 +513,9 @@ namespace Backend.Hubs
                     case Abilities.nilfgaard3:
                         // Pasywka — nie robi nic przy zagraniu, działa przy Wskrzeszeniu
                         break;
-                    case Abilities.nilfgaard4: abilityUseCases.TheRelentlessAbility(game, card); break;
+                    case Abilities.nilfgaard4:
+                        await Clients.Caller.SendAsync("RequestOpponentResurrection");
+                        return;
                     case Abilities.nilfgaard5: abilityUseCases.TheWhiteFlameAbility(game); break;
                     case Abilities.polnoc1: abilityUseCases.KingOfTemeriaAbility(game); break;
                     case Abilities.polnoc2: abilityUseCases.CommanderOfTheNorthAbility(game); break;
