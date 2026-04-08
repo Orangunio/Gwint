@@ -25,8 +25,8 @@ export interface GameBoard {
   player2FirstCardRow: GameCard[]
   player2SecondCardRow: GameCard[]
   player2ThirdCardRow: GameCard[]
-  rowScores: number[][];
-  rogDowodcyActive: boolean[][];
+  rowScores: number[][]
+  rogDowodcyActive: boolean[][]
   frostActive: boolean
   fogActive: boolean
   rainActive: boolean
@@ -73,8 +73,9 @@ interface SignalRState {
 
   game: GameState | null
   myTurn: boolean
-  pendingAction: 'agility' | 'resurrection' | 'decoy' | 'horn' | null
+  pendingAction: 'agility' | 'resurrection' | 'decoy' | 'horn' | 'revealCards' | 'revealResurrection' | 'opponentResurrection' | null
   pendingCardId: number | null
+  revealedOpponentCards: GameCard[]
 
   selectedFraction: number | null
   opponentSelectedFraction: number | null
@@ -85,6 +86,8 @@ interface SignalRState {
 
   isConnecting: boolean
   error: string | null
+
+  randomResurrectionCard: GameCard | null
 }
 
 export const useSignalRStore = defineStore('signalr', {
@@ -103,6 +106,7 @@ export const useSignalRStore = defineStore('signalr', {
     myTurn: false,
     pendingAction: null,
     pendingCardId: null,
+    revealedOpponentCards: [],
 
     selectedFraction: null,
     opponentSelectedFraction: null,
@@ -113,6 +117,8 @@ export const useSignalRStore = defineStore('signalr', {
 
     isConnecting: false,
     error: null,
+
+    randomResurrectionCard: null,
   }),
 
   getters: {
@@ -263,6 +269,7 @@ export const useSignalRStore = defineStore('signalr', {
         this.myTurn = false
         this.pendingAction = null
         this.pendingCardId = null
+        this.revealedOpponentCards = []
         this.gameResult = null
         this.gameResultWinner = null
       })
@@ -275,17 +282,20 @@ export const useSignalRStore = defineStore('signalr', {
         this.myTurn = connectionId === this.roomConnectionId
         this.pendingAction = null
         this.pendingCardId = null
+        this.revealedOpponentCards = []
       })
 
       conn.on('NextTurn', (connectionId: string) => {
         this.myTurn = connectionId === this.roomConnectionId
         this.pendingAction = null
         this.pendingCardId = null
+        this.revealedOpponentCards = []
       })
 
       conn.on('RoundStarted', ({ game, currentPlayerId }) => {
         this.game = game
         this.myTurn = currentPlayerId === this.roomConnectionId
+        this.revealedOpponentCards = []
       })
 
       conn.on('Player1WonGame', (game: GameState) => {
@@ -305,26 +315,40 @@ export const useSignalRStore = defineStore('signalr', {
       })
 
       conn.on('ScoiataelChooseFirstPlayer', () => {
-        this.pendingAction = 'agility';
-      });
+        this.pendingAction = 'agility'
+      })
 
       conn.on('RequestAgilityRow', (cardId: number) => {
-        this.pendingAction = 'agility';
-        this.pendingCardId = cardId;
-      });
+        this.pendingAction = 'agility'
+        this.pendingCardId = cardId
+      })
 
       conn.on('RequestResurrectionTarget', () => {
-        this.pendingAction = 'resurrection';
-      });
+        this.pendingAction = 'resurrection'
+      })
 
       conn.on('SelectCardToDecoy', (cardId: number) => {
-        this.pendingAction = 'decoy';
-        this.pendingCardId = cardId;
-      });
+        this.pendingAction = 'decoy'
+        this.pendingCardId = cardId
+      })
 
       conn.on('RequestHornRow', (cardId: number) => {
         this.pendingAction = 'horn'
         this.pendingCardId = cardId
+      })
+
+      conn.on('RevealOpponentCards', (cards: GameCard[]) => {
+        this.revealedOpponentCards = cards
+        this.pendingAction = 'revealCards'
+      })
+
+      conn.on('RandomResurrectionResult', (card: GameCard) => {
+        this.randomResurrectionCard = card
+        this.pendingAction = 'revealResurrection'
+      })
+
+      conn.on("RequestOpponentResurrection", () => {
+        this.pendingAction = "opponentResurrection"
       })
     },
 
@@ -374,11 +398,25 @@ export const useSignalRStore = defineStore('signalr', {
     },
 
     async resolveHorn(row: number) {
-      console.log('Kliknięto horn row:', row)
-
       if (!this.gameConnection || !this.roomId) return
-
       await this.gameConnection.invoke('ResolveHorn', this.roomId, row)
+      this.pendingAction = null
+    },
+
+    async confirmReveal() {
+      if (!this.gameConnection || !this.roomId) return
+      await this.gameConnection.invoke('ConfirmReveal', this.roomId)
+      this.revealedOpponentCards = []
+      this.pendingAction = null
+    },
+
+    async resolveOpponentResurrection(cardId: number) {
+      if (!this.gameConnection || !this.roomId) return
+      await this.gameConnection.invoke(
+        "ResolveOpponentResurrection",
+        this.roomId,
+        cardId
+      )
 
       this.pendingAction = null
     },
@@ -403,6 +441,10 @@ export const useSignalRStore = defineStore('signalr', {
       this.myTurn = false
       this.gameResult = null
       this.gameResultWinner = null
+      this.revealedOpponentCards = []
+      this.pendingAction = null
+      this.pendingCardId = null
+      this.randomResurrectionCard = null
     },
   },
 })
