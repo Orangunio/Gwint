@@ -60,7 +60,6 @@ namespace Backend.Hubs
                 return;
             }
 
-            // Host dołącza do grupy GameHub (bez aktualizacji connectionId — gra jeszcze nie istnieje)
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
             var player1Db = await gwintDBContext.Players
@@ -93,7 +92,6 @@ namespace Backend.Hubs
 
             var game = new Game(player1Deck, player2Deck, player1SelectedFraction, player2SelectedFraction);
 
-            // Kopiujemy graczy z RoomHub — connectionId to na razie roomConnectionId
             game.Player1 = room.Players[0];
             game.Player2 = room.Players[1];
             game.RoomId = roomId;
@@ -105,10 +103,6 @@ namespace Backend.Hubs
 
             game.Player1CardsInDeck = GameUseCases.Shuffle(player1Deck);
             game.Player2CardsInDeck = GameUseCases.Shuffle(player2Deck);
-            //game.Player1CardsOnHand = game.Player1CardsInDeck.Take(10).ToList();
-            //game.Player2CardsOnHand = game.Player2CardsInDeck.Take(10).ToList();
-            //game.Player1CardsInDeck = game.Player1CardsInDeck.Skip(10).ToList();
-            //game.Player2CardsInDeck = game.Player2CardsInDeck.Skip(10).ToList();
 
             game.Player1CardsOnHand = game.Player1CardsInDeck.ToList();
             game.Player2CardsOnHand = game.Player2CardsInDeck.ToList();
@@ -135,8 +129,6 @@ namespace Backend.Hubs
         public async Task PlayerPass(string roomId)
         {
             var game = gameUseCases.games[roomId];
-
-            var player = game.CurrentPlayer;
 
             if (game.CurrentPlayer == game.Player1)
             {
@@ -170,8 +162,7 @@ namespace Backend.Hubs
             {
                 game.Player1RoundsWon++;
                 game.CurrentPlayer = game.Player1;
-                //Pasywka polnocy
-                if(game.Player1SelectedFraction == Fractions.NorthernRealms)
+                if (game.Player1SelectedFraction == Fractions.NorthernRealms)
                 {
                     if (game.Player1CardsInDeck.Any())
                     {
@@ -185,7 +176,6 @@ namespace Backend.Hubs
             {
                 game.Player2RoundsWon++;
                 game.CurrentPlayer = game.Player2;
-                //pasywka polnocy
                 if (game.Player2SelectedFraction == Fractions.NorthernRealms)
                 {
                     if (game.Player2CardsInDeck.Any())
@@ -198,8 +188,7 @@ namespace Backend.Hubs
             }
             else
             {
-                //pasywka nilfgardu
-                if(game.Player1SelectedFraction == Fractions.Nilfgaard)
+                if (game.Player1SelectedFraction == Fractions.Nilfgaard)
                 {
                     game.Player1RoundsWon++;
                 }
@@ -214,7 +203,7 @@ namespace Backend.Hubs
                 }
             }
 
-            if(game.Player1RoundsWon == 2)
+            if (game.Player1RoundsWon == 2)
             {
                 await Clients.Group(roomId)
                     .SendAsync("Player1WonGame", game);
@@ -245,7 +234,7 @@ namespace Backend.Hubs
                 game.Board.FogActive = false;
                 game.Board.RainActive = false;
 
-                for(int i=0; i< 3; i++)
+                for (int i = 0; i < 3; i++)
                 {
                     game.Board.RogDowodcyActive[0][i] = false;
                     game.Board.RogDowodcyActive[1][i] = false;
@@ -264,8 +253,8 @@ namespace Backend.Hubs
 
         public void MoveRowOnDisplay(List<Card> row, List<Card> display)
         {
-            foreach (Card card in row) 
-            { 
+            foreach (Card card in row)
+            {
                 card.finalStrength = card.Strength;
             }
             display.AddRange(row);
@@ -279,7 +268,6 @@ namespace Backend.Hubs
             bool player1Scoia = game.Player1SelectedFraction == Fractions.ScoiaTael;
             bool player2Scoia = game.Player2SelectedFraction == Fractions.ScoiaTael;
 
-            // jeśli dokładnie jeden ma Scoia'tael
             if (player1Scoia ^ player2Scoia)
             {
                 var scoiaPlayer = player1Scoia ? game.Player1 : game.Player2;
@@ -294,6 +282,13 @@ namespace Backend.Hubs
                 await Clients.Group(roomId)
                     .SendAsync("TurnStarted", player.ConnectionId);
             }
+        }
+
+        // Sprawdza czy aktualny gracz ma dowódcę z pasywką losowego wskrzeszenia
+        private bool HasRandomResurrectionPassive(Game game)
+        {
+            return game.Player1CommanderCard?.ability == Abilities.nilfgaard3
+                || game.Player2CommanderCard?.ability == Abilities.nilfgaard3;
         }
 
         public async Task PlayCard(string roomId, Card selectedCardByUser, int? selectedRow = null)
@@ -314,18 +309,22 @@ namespace Backend.Hubs
                     abilityUseCases.AddCardToBoard(game, currentPlayer, selectedCardByUser.place, selectedCardByUser);
                 }
             }
+
             await ExecuteCardAbility(roomId, game, selectedCardByUser, selectedRow);
+
             bool needsInteraction =
                 selectedCardByUser.ability == Abilities.manekinDoCwiczen ||
-                (selectedCardByUser.ability == Abilities.wskrzeszenie && HasRevivableCards(game)) ||
+                (selectedCardByUser.ability == Abilities.wskrzeszenie && HasRevivableCards(game) && !HasRandomResurrectionPassive(game)) ||
                 (selectedCardByUser.ability == Abilities.zwinnośc && selectedRow == null) ||
-                (selectedCardByUser.ability == Abilities.rogDowodcy && selectedRow == null); // ← zmiana
+                (selectedCardByUser.ability == Abilities.rogDowodcy && selectedRow == null) ||
+                (selectedCardByUser.isCommander && selectedCardByUser.ability == Abilities.nilfgaard1);
 
             if (!needsInteraction)
             {
                 await FinishTurn(roomId, game);
             }
         }
+
         private async Task FinishTurn(string roomId, Game game)
         {
             UpdateCardsFinalStrength(game);
@@ -363,6 +362,7 @@ namespace Backend.Hubs
             var graveyard = game.CurrentPlayer == game.Player1 ? game.Player1CardsOnDisplay : game.Player2CardsOnDisplay;
             return graveyard.Any(c => !c.isChampion && !c.isSpecial);
         }
+
         public async Task ResolveResurrection(string roomId, int cardToReviveId)
         {
             if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
@@ -419,8 +419,13 @@ namespace Backend.Hubs
             abilityUseCases.RogDowodcy(game, row);
 
             await FinishTurn(roomId, game);
-
             await SendGameStateToAll(roomId, game);
+        }
+
+        public async Task ConfirmReveal(string roomId)
+        {
+            if (!gameUseCases.games.TryGetValue(roomId, out var game)) return;
+            await FinishTurn(roomId, game);
         }
 
         private async Task ExecuteCardAbility(string roomId, Game game, Card card, int? selectedRow = null)
@@ -429,9 +434,17 @@ namespace Backend.Hubs
             {
                 switch (card.ability)
                 {
-                    case Abilities.nilfgaard1: abilityUseCases.EmperorOfNilfgardAbility(game.CurrentPlayer == game.Player1? game.Player2CardsOnHand : game.Player1CardsOnHand); break;
+                    case Abilities.nilfgaard1:
+                        var opponentHand = game.CurrentPlayer == game.Player1
+                            ? game.Player2CardsOnHand
+                            : game.Player1CardsOnHand;
+                        var revealedCards = abilityUseCases.EmperorOfNilfgardAbility(opponentHand);
+                        await Clients.Caller.SendAsync("RevealOpponentCards", revealedCards);
+                        break;
                     case Abilities.nilfgaard2: abilityUseCases.HisEmperialmajestyAbility(game); break;
-                    case Abilities.nilfgaard3: abilityUseCases.InvaiderOfTheNorthAbility(game, card); break;
+                    case Abilities.nilfgaard3:
+                        // Pasywka — nie robi nic przy zagraniu, działa przy Wskrzeszeniu
+                        break;
                     case Abilities.nilfgaard4: abilityUseCases.TheRelentlessAbility(game, card); break;
                     case Abilities.nilfgaard5: abilityUseCases.TheWhiteFlameAbility(game); break;
                     case Abilities.polnoc1: abilityUseCases.KingOfTemeriaAbility(game); break;
@@ -439,7 +452,6 @@ namespace Backend.Hubs
                     case Abilities.polnoc3: abilityUseCases.SonOfMedellAbility(game); break;
                     case Abilities.polnoc4: abilityUseCases.TheSiegemasterAbility(game); break;
                     case Abilities.polnoc5: abilityUseCases.TheSteelForged(game); break;
-
                 }
             }
             else
@@ -462,7 +474,35 @@ namespace Backend.Hubs
                         break;
                     case Abilities.wskrzeszenie:
                         if (HasRevivableCards(game))
-                            await Clients.Caller.SendAsync("RequestResurrectionTarget");
+                        {
+                            // Jeśli gracz ma pasywkę Najezdnika Północy — wskrzeszamy losowo
+                            if (HasRandomResurrectionPassive(game))
+                            {
+                                var graveyard = game.CurrentPlayer == game.Player1
+                                    ? game.Player1CardsOnDisplay
+                                    : game.Player2CardsOnDisplay;
+
+                                var revivable = graveyard
+                                    .Where(c => !c.isChampion && !c.isSpecial)
+                                    .ToList();
+
+                                var rnd = new Random();
+                                var randomCard = revivable[rnd.Next(revivable.Count)];
+
+                                graveyard.Remove(randomCard);
+                                if (randomCard.ability != Abilities.zwinnośc && randomCard.ability != Abilities.szpieg)
+                                    abilityUseCases.AddCardToBoard(game, game.CurrentPlayer, randomCard.place, randomCard);
+
+                                await ExecuteCardAbility(roomId, game, randomCard);
+
+                                // Informujemy gracza jaką kartę wskrzeszono
+                                await Clients.Caller.SendAsync("RandomResurrectionResult", randomCard);
+                            }
+                            else
+                            {
+                                await Clients.Caller.SendAsync("RequestResurrectionTarget");
+                            }
+                        }
                         break;
                     case Abilities.zwinnośc:
                         if (selectedRow == null)
@@ -480,14 +520,11 @@ namespace Backend.Hubs
                         abilityUseCases.PozogaJednostkiAbility(game, card);
                         break;
                     default:
-                        // Dla pasywnych skilli jak Więź czy Morale
                         abilityUseCases.WiezAbility(game);
                         abilityUseCases.WyzszeMoraleAbility(game);
                         break;
                 }
-
             }
-
         }
     }
-} 
+}

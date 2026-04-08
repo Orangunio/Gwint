@@ -579,6 +579,7 @@ namespace Backend.UseCases
 
                 foreach (var c in cardsToDestroy)
                 {
+                    game.Player2CardsOnDisplay.Add(c);
                     game.Board.Player2SecondCardRow.Remove(c);
                 }
             }
@@ -598,6 +599,7 @@ namespace Backend.UseCases
 
                 foreach (var c in cardsToDestroy)
                 {
+                    game.Player1CardsOnDisplay.Add(c);
                     game.Board.Player1SecondCardRow.Remove(c);
                 }
             }
@@ -636,6 +638,7 @@ namespace Backend.UseCases
 
                 foreach (var c in cardsToDestroy)
                 {
+                    game.Player2CardsOnDisplay.Add(c);
                     game.Board.Player2ThirdCardRow.Remove(c);
                 }
             }
@@ -655,6 +658,7 @@ namespace Backend.UseCases
 
                 foreach (var c in cardsToDestroy)
                 {
+                    game.Player1CardsOnDisplay.Add(c);
                     game.Board.Player1ThirdCardRow.Remove(c);
                 }
             }
