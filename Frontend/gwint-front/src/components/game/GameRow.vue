@@ -35,6 +35,12 @@
         />
       </div>
     </div>
+
+    <!-- Wskaźnik Rogu Dowódcy -->
+    <div class="horn-indicator" :class="{ 'horn-indicator--active': hornActive }">
+      <v-icon icon="mdi-bugle" size="18" />
+      <span class="horn-indicator-label">Róg</span>
+    </div>
   </div>
 </template>
 
@@ -46,14 +52,16 @@ import GameCard from './GameCard.vue'
 const props = withDefaults(
   defineProps<{
     cards: GameCardType[]
-    rowIndex: number       // 0=piechota, 1=dystans, 2=oblężenie
+    rowIndex: number
     rowScore: number
+    hornActive?: boolean
     canDrop?: boolean
     frostActive?: boolean
     fogActive?: boolean
     rainActive?: boolean
   }>(),
   {
+    hornActive: false,
     canDrop: false,
     frostActive: false,
     fogActive: false,
@@ -189,5 +197,36 @@ const weatherIcon = computed(() => {
 .cards-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 215, 64, 0.2);
   border-radius: 2px;
+}
+
+/* ─── Wskaźnik Rogu Dowódcy ─────────────────────────────────────── */
+
+.horn-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  width: 36px;
+  padding: 4px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.horn-indicator--active {
+  color: #ffd740;
+  border-color: rgba(255, 215, 64, 0.4);
+  background: rgba(255, 215, 64, 0.1);
+  box-shadow: 0 0 8px rgba(255, 215, 64, 0.2), inset 0 0 8px rgba(255, 215, 64, 0.05);
+}
+
+.horn-indicator-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: inherit;
 }
 </style>
