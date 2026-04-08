@@ -73,7 +73,7 @@ interface SignalRState {
 
   game: GameState | null
   myTurn: boolean
-  pendingAction: 'agility' | 'resurrection' | 'decoy' | 'horn' | 'revealCards' | 'revealResurrection' | null
+  pendingAction: 'agility' | 'resurrection' | 'decoy' | 'horn' | 'revealCards' | 'revealResurrection' | 'opponentResurrection' | null
   pendingCardId: number | null
   revealedOpponentCards: GameCard[]
 
@@ -346,6 +346,10 @@ export const useSignalRStore = defineStore('signalr', {
         this.randomResurrectionCard = card
         this.pendingAction = 'revealResurrection'
       })
+
+      conn.on("RequestOpponentResurrection", () => {
+        this.pendingAction = "opponentResurrection"
+      })
     },
 
     async startGame(fraction1: number, fraction2: number) {
@@ -403,6 +407,17 @@ export const useSignalRStore = defineStore('signalr', {
       if (!this.gameConnection || !this.roomId) return
       await this.gameConnection.invoke('ConfirmReveal', this.roomId)
       this.revealedOpponentCards = []
+      this.pendingAction = null
+    },
+
+    async resolveOpponentResurrection(cardId: number) {
+      if (!this.gameConnection || !this.roomId) return
+      await this.gameConnection.invoke(
+        "ResolveOpponentResurrection",
+        this.roomId,
+        cardId
+      )
+
       this.pendingAction = null
     },
 

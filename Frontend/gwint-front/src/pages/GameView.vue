@@ -234,7 +234,7 @@
           <GameCard
             v-if="signalRStore.myCommander"
             :card="signalRStore.myCommander"
-            :playable="signalRStore.myTurn && !commanderUsed"
+            :playable="signalRStore.myTurn && !commanderUsed && canUseCommander"
             :selected="selectedCard?.id === signalRStore.myCommander?.id"
             class="commander-card"
             @play="selectCard(signalRStore.myCommander!)"
@@ -302,6 +302,37 @@
           </div>
         </div>
       </div>
+
+      <!-- ═══ DIALOG: Wskrzeszenie z cmentarza przeciwnika ═══ -->
+      <v-dialog v-model="showOpponentResurrectionDialog" max-width="500" persistent>
+        <v-card class="gwint-dialog" rounded="xl" elevation="0">
+          <v-card-title class="pa-6 pb-2">
+            Wskrzeszenie (Cmentarz przeciwnika)
+          </v-card-title>
+
+          <v-card-text class="pa-6">
+            <p class="text-medium-emphasis mb-4">
+              Wybierz kartę z cmentarza przeciwnika:
+            </p>
+
+            <div class="d-flex flex-wrap ga-3 justify-center">
+              <GameCard
+                v-for="card in opponentRevivableCards"
+                :key="card.id"
+                :card="card"
+                :playable="true"
+                @play="resolveOpponentResurrection(card)"
+              />
+            </div>
+          </v-card-text>
+
+          <v-card-actions class="pa-4">
+            <v-btn variant="text" @click="cancelPendingAction">
+              Anuluj
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <!-- ═══ DIALOG: Losowe wskrzeszenie (Najezdnik Północy) ═══ -->
       <v-dialog v-model="showRandomResurrectionDialog" max-width="400" persistent>
@@ -663,6 +694,38 @@ const showRevealDialog = computed(() => signalRStore.pendingAction === 'revealCa
 
 const showRandomResurrectionDialog = computed(() => signalRStore.pendingAction === 'revealResurrection')
 
+const opponentRevivableCards = computed(() => {
+  if (!signalRStore.game) return []
+
+  return signalRStore.amIPlayer1
+    ? (signalRStore.game.player2CardsOnDisplay.filter(c => !c.isChampion && !c.isSpecial) ?? [])
+    : (signalRStore.game.player1CardsOnDisplay.filter(c => !c.isChampion && !c.isSpecial) ?? [])
+})
+
+const showOpponentResurrectionDialog = computed(
+  () => signalRStore.pendingAction === 'opponentResurrection'
+)
+
+const canUseCommander = computed(() => {
+  if (!signalRStore.game) return false
+
+  const myCommander = signalRStore.myCommander
+  const opponentCommander = signalRStore.opponentPlayer
+
+  if (!myCommander) return false
+
+  // ID 11 blokuje wszystko
+  if (
+    signalRStore.game.player1CommanderCard?.id === 11 ||
+    signalRStore.game.player2CommanderCard?.id === 11
+  ) return false
+
+  // ID 9 blokuje tylko mnie
+  if (myCommander.id === 9) return false
+
+  return true
+})
+
 async function confirmRandomResurrection() {
   signalRStore.randomResurrectionCard = null
   signalRStore.pendingAction = null
@@ -711,6 +774,13 @@ function selectCard(card: GameCardType) {
     if (card.ability === 12) {
       selectedCard.value = card
       signalRStore.pendingAction = 'decoy'
+      return
+    }
+
+    if (card.isCommander && card.ability === 20) {
+      selectedCard.value = card
+      signalRStore.pendingCardId = card.id
+      signalRStore.pendingAction = 'opponentResurrection'
       return
     }
 
@@ -777,6 +847,16 @@ async function resolveHorn(row: number) {
   signalRStore.pendingCardId = null
   try { await signalRStore.playCard(card, row) }
   catch (e) { console.error('Błąd zagrania rogu', e) }
+}
+
+async function resolveOpponentResurrection(card: GameCardType) {
+  if (!card) return
+
+  try {
+    await signalRStore.resolveOpponentResurrection(card.id)
+  } catch (e) {
+    console.error('Błąd wskrzeszenia z cmentarza przeciwnika', e)
+  }
 }
 
 // ─── LIFECYCLE ──────────────────────────────────────────────────────
