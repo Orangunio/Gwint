@@ -294,6 +294,7 @@ namespace Backend.UseCases
 
                 foreach (var card in cardsToDestroy)
                 {
+                    card.finalStrength = card.Strength;
                     enemyRow.Remove(card);
                     enemyGraveyard.Add(card);
                 }
@@ -313,9 +314,40 @@ namespace Backend.UseCases
 
         #region Umiejetnosci kart specjalnych
 
-        public void RogDowodcy(Game game)
+        public void RogDowodcy(Game game, int row)
         {
-            game.Board.CalculateRowScores();
+            if(game.CurrentPlayer == game.Player1)
+            {
+                switch (row)
+                {
+                    case 1:
+                        game.Board.RogDowodcyActive[0][0] = true;
+                        break;
+                    case 2:
+                        game.Board.RogDowodcyActive[0][1] = true;
+                        break;
+                    case 3:
+                        game.Board.RogDowodcyActive[0][2] = true;
+                        break;
+                }
+            }
+            else
+            {
+                switch (row)
+                {
+                    case 1:
+                        game.Board.RogDowodcyActive[1][0] = true;
+                        break;
+                    case 2:
+                        game.Board.RogDowodcyActive[1][1] = true;
+                        break;
+                    case 3:
+                        game.Board.RogDowodcyActive[1][2] = true;
+                        break;
+                }
+            }
+
+             game.Board.CalculateAllRows(game);
         }
 
         public void Pozoga(Game game)
@@ -332,7 +364,9 @@ namespace Backend.UseCases
 
             if (allCards.Any())
             {
-                maxStrength = allCards.Max(c => c.finalStrength);
+                maxStrength = allCards
+                    .Where(c => !c.isChampion)
+                    .Max(c => c.finalStrength);
             }
 
             void RemoveStrongest(List<Card> row, List<Card> graveyard)
@@ -343,6 +377,7 @@ namespace Backend.UseCases
 
                 foreach (var card in toRemove)
                 {
+                    card.finalStrength = card.Strength;
                     row.Remove(card);
                     graveyard.Add(card);
                 }
@@ -463,7 +498,7 @@ namespace Backend.UseCases
             {
                 place = Place.FirstRow;
             }
-            if (row == 1)
+            else if (row == 1)
             {
                 place = Place.SecondRow;
             }

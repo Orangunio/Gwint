@@ -98,6 +98,16 @@ namespace Backend.Models
             return totalScore;
         }
 
+        public void CalculateAllRows(Game game)
+        {
+            CalculateRow(game.Board.Player1FirstCardRow, game.Board.FrostActive, game.Board.RogDowodcyActive[0][0]);
+            CalculateRow(game.Board.Player1SecondCardRow, game.Board.FogActive, game.Board.RogDowodcyActive[0][1]);
+            CalculateRow(game.Board.Player1ThirdCardRow, game.Board.RainActive, game.Board.RogDowodcyActive[0][2]);
+            CalculateRow(game.Board.Player2FirstCardRow, game.Board.FrostActive, game.Board.RogDowodcyActive[1][0]);
+            CalculateRow(game.Board.Player2SecondCardRow, game.Board.FogActive, game.Board.RogDowodcyActive[1][1]);
+            CalculateRow(game.Board.Player2ThirdCardRow, game.Board.RainActive, game.Board.RogDowodcyActive[1][2]);
+        }
+
         public void CalculateRow(List<Card> row, bool weather, bool horn)
         {
             if (row == null || row.Count == 0)
@@ -152,7 +162,7 @@ namespace Backend.Models
             bool unitHornExists = row.Any(c => c.ability == Abilities.rogDowodcyJednostki);
             int hornCount = row.Count(c => c.ability == Abilities.rogDowodcyJednostki);
 
-            if (unitHornExists)
+            if (unitHornExists && horn == false)
             {
                 if (hornCount == 1)
                 {

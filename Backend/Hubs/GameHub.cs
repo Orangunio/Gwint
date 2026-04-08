@@ -105,10 +105,13 @@ namespace Backend.Hubs
 
             game.Player1CardsInDeck = GameUseCases.Shuffle(player1Deck);
             game.Player2CardsInDeck = GameUseCases.Shuffle(player2Deck);
-            game.Player1CardsOnHand = game.Player1CardsInDeck.Take(10).ToList();
-            game.Player2CardsOnHand = game.Player2CardsInDeck.Take(10).ToList();
-            game.Player1CardsInDeck = game.Player1CardsInDeck.Skip(10).ToList();
-            game.Player2CardsInDeck = game.Player2CardsInDeck.Skip(10).ToList();
+            //game.Player1CardsOnHand = game.Player1CardsInDeck.Take(10).ToList();
+            //game.Player2CardsOnHand = game.Player2CardsInDeck.Take(10).ToList();
+            //game.Player1CardsInDeck = game.Player1CardsInDeck.Skip(10).ToList();
+            //game.Player2CardsInDeck = game.Player2CardsInDeck.Skip(10).ToList();
+
+            game.Player1CardsOnHand = game.Player1CardsInDeck.ToList();
+            game.Player2CardsOnHand = game.Player2CardsInDeck.ToList();
 
             if (game.Board == null) game.Board = new Board();
 
@@ -246,6 +249,9 @@ namespace Backend.Hubs
                 {
                     game.Board.RogDowodcyActive[0][i] = false;
                     game.Board.RogDowodcyActive[1][i] = false;
+
+                    game.Board.RowScores[0][i] = 0;
+                    game.Board.RowScores[1][i] = 0;
                 }
 
                 await Clients.Group(roomId).SendAsync("RoundStarted", new
@@ -258,6 +264,10 @@ namespace Backend.Hubs
 
         public void MoveRowOnDisplay(List<Card> row, List<Card> display)
         {
+            foreach (Card card in row) 
+            { 
+                card.finalStrength = card.Strength;
+            }
             display.AddRange(row);
             row.Clear();
         }
@@ -305,9 +315,11 @@ namespace Backend.Hubs
                 }
             }
             await ExecuteCardAbility(roomId, game, selectedCardByUser, selectedRow);
-            bool needsInteraction = selectedCardByUser.ability == Abilities.manekinDoCwiczen ||
-                                   (selectedCardByUser.ability == Abilities.wskrzeszenie && HasRevivableCards(game)) ||
-                                   (selectedCardByUser.ability == Abilities.zwinnośc && selectedRow == null);
+            bool needsInteraction =
+                selectedCardByUser.ability == Abilities.manekinDoCwiczen ||
+                (selectedCardByUser.ability == Abilities.wskrzeszenie && HasRevivableCards(game)) ||
+                (selectedCardByUser.ability == Abilities.zwinnośc && selectedRow == null) ||
+                (selectedCardByUser.ability == Abilities.rogDowodcy && selectedRow == null); // ← zmiana
 
             if (!needsInteraction)
             {
@@ -360,7 +372,7 @@ namespace Backend.Hubs
             if (cardToRevive != null)
             {
                 graveyard.Remove(cardToRevive);
-                if (cardToRevive.ability != Abilities.zwinnośc)
+                if (cardToRevive.ability != Abilities.zwinnośc && cardToRevive.ability != Abilities.szpieg)
                     abilityUseCases.AddCardToBoard(game, game.CurrentPlayer, cardToRevive.place, cardToRevive);
 
                 await ExecuteCardAbility(roomId, game, cardToRevive);
@@ -383,18 +395,32 @@ namespace Backend.Hubs
                 ? new[] { game.Board.Player1FirstCardRow, game.Board.Player1SecondCardRow, game.Board.Player1ThirdCardRow }
                 : new[] { game.Board.Player2FirstCardRow, game.Board.Player2SecondCardRow, game.Board.Player2ThirdCardRow };
 
-            Card cardOnBoard = null;
+            Card? cardOnBoard = null;
             foreach (var row in playerRows)
             {
                 cardOnBoard = row.FirstOrDefault(c => c.Id == targetCardId);
                 if (cardOnBoard != null && !cardOnBoard.isChampion)
                 {
+                    cardOnBoard.finalStrength = cardOnBoard.Strength;
                     abilityUseCases.ManekinDoCwiczenAbility(game, cardOnBoard);
                     await FinishTurn(roomId, game);
                     await SendGameStateToAll(roomId, game);
                     break;
                 }
             }
+        }
+
+        public async Task ResolveHorn(string roomId, int row)
+        {
+            var game = gameUseCases.games[roomId];
+
+            Console.WriteLine($"[HORN] Row: {row}");
+
+            abilityUseCases.RogDowodcy(game, row);
+
+            await FinishTurn(roomId, game);
+
+            await SendGameStateToAll(roomId, game);
         }
 
         private async Task ExecuteCardAbility(string roomId, Game game, Card card, int? selectedRow = null)
@@ -425,6 +451,12 @@ namespace Backend.Hubs
                     case Abilities.ulewnyDeszcz: abilityUseCases.UlewnyDeszczAbility(game); break;
                     case Abilities.czysteNiebo: abilityUseCases.CzysteNieboAbility(game); break;
                     case Abilities.pozoga: abilityUseCases.Pozoga(game); break;
+                    case Abilities.rogDowodcy:
+                        if (selectedRow == null)
+                            await Clients.Caller.SendAsync("RequestHornRow", card.Id);
+                        else
+                            abilityUseCases.RogDowodcy(game, (int)selectedRow);
+                        break;
                     case Abilities.manekinDoCwiczen:
                         await Clients.Caller.SendAsync("SelectCardToDecoy", card.Id);
                         break;
