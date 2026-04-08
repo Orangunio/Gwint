@@ -160,6 +160,27 @@
 
         <!-- PLANSZA GRY — rzędy -->
         <div class="board-area">
+          <v-dialog v-model="showHornDialog" max-width="400" persistent>
+            <v-card class="gwint-dialog" rounded="xl" elevation="0">
+              <v-card-title class="pa-6 pb-2">Róg Dowódcy</v-card-title>
+              <v-card-text class="pa-6">
+                <p class="text-medium-emphasis mb-4">
+                  Wybierz rząd, który chcesz wzmocnić:
+                </p>
+                <div class="d-flex ga-3 justify-center">
+                  <v-btn
+                    v-for="row in hornRows"
+                    :key="row.value"
+                    :color="row.color"
+                    variant="outlined"
+                    @click="resolveHorn(row.value)"
+                  >
+                    {{ row.label }}
+                  </v-btn>
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-dialog>
 
           <!-- Rzędy przeciwnika (od góry: oblężenie → dystans → piechota) -->
           <div class="board-rows board-rows--opponent">
@@ -169,6 +190,7 @@
               :cards="row"
               :row-index="2 - idx"
               :row-score="opponentRowScores[2 - idx]"
+              :horn-active="board?.rogDowodcyActive?.[amIP1 ? 1 : 0]?.[2 - idx] ?? false"
               :frost-active="board?.frostActive"
               :fog-active="board?.fogActive"
               :rain-active="board?.rainActive"
@@ -182,7 +204,7 @@
             <div class="divider-line" />
           </div>
 
-          <!-- Rzędy gracza (od góry: piechota → dystans → oblężenie) -->
+           <!-- Rzędy gracza (od góry: piechota → dystans → oblężenie) -->
           <div class="board-rows board-rows--me">
             <GameRow
               v-for="(row, idx) in myRows"
@@ -190,6 +212,7 @@
               :cards="row"
               :row-index="idx"
               :row-score="myRowScores[idx]"
+              :horn-active="board?.rogDowodcyActive?.[amIP1 ? 0 : 1]?.[idx] ?? false"
               :can-drop="signalRStore.myTurn && !!selectedCard && canPlayInRow(selectedCard, idx)"
               :frost-active="board?.frostActive"
               :fog-active="board?.fogActive"
@@ -320,7 +343,7 @@
             </div>
           </v-card-text>
           <v-card-actions class="pa-4">
-            <v-btn variant="text" @click="signalRStore.pendingAction = null">Anuluj</v-btn>
+            <v-btn variant="text" @click="cancelPendingAction">Anuluj</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -568,6 +591,14 @@ const opponentHandCount = computed(() => {
     : (signalRStore.game.player1CardsOnHand?.length ?? 0)
 })
 
+const showHornDialog = computed(() => signalRStore.pendingAction === 'horn')
+
+const hornRows = [
+  { label: 'Piechota', value: 1, color: 'red-lighten-2' },
+  { label: 'Dystans', value: 2, color: 'green-lighten-2' },
+  { label: 'Oblężenie', value: 3, color: 'blue-lighten-2' },
+]
+
 // Aktualizuj numer rundy na podstawie wygranych rund
 watch([myRoundsWon, opponentRoundsWon], () => {
   currentRound.value = myRoundsWon.value + opponentRoundsWon.value + 1
@@ -594,7 +625,25 @@ function selectCard(card: GameCardType) {
   if (!signalRStore.myTurn) return
   if (selectedCard.value?.id === card.id) { selectedCard.value = null; return }
   selectedCard.value = card
-  if (card.isSpecial) { playCardDirectly(card); return }
+  if (card.isSpecial) {
+    // SPECJALNE traktujemy inaczej
+
+    if (card.ability === 10) {
+      selectedCard.value = card
+      signalRStore.pendingCardId = card.id
+      signalRStore.pendingAction = 'horn'
+      return
+    }
+
+    if (card.ability === 12) {
+      selectedCard.value = card
+      signalRStore.pendingAction = 'decoy'
+      return
+    }
+
+    playCardDirectly(card)
+    return
+  }
   const validRows = [0, 1, 2].filter(i => canPlayInRow(card, i))
   if (validRows.length === 1 && card.ability !== 3) { playInRow(card, validRows[0]); return }
   if (card.isCommander) { playCardDirectly(card); return }
@@ -640,9 +689,27 @@ async function goToLobby() {
   await router.push({ name: 'lobby' })
 }
 
+async function cancelPendingAction() {
+  signalRStore.pendingAction = null
+  selectedCard.value = null
+}
+
+async function resolveHorn(row: number) {
+  if (!signalRStore.pendingCardId) return
+  const card = signalRStore.myHand.find(c => c.id === signalRStore.pendingCardId)
+             ?? signalRStore.myCommander
+  if (!card) return
+  selectedCard.value = null
+  signalRStore.pendingAction = null
+  signalRStore.pendingCardId = null
+  try { await signalRStore.playCard(card, row) }
+  catch (e) { console.error('Błąd zagrania rogu', e) }
+}
+
 // ─── LIFECYCLE ──────────────────────────────────────────────────────
 
 onMounted(async () => {
+  console.log('INIT ID:', signalRStore.gameConnectionId)
   if (!signalRStore.isGameConnected) {
     await router.push({ name: 'lobby' })
     return
@@ -657,9 +724,13 @@ onUnmounted(async () => {
   await signalRStore.disconnect()
 })
 
-watch(() => signalRStore.gameConnectionId, (newId) => {
-  console.log('gameConnectionId zmienione na:', newId)
-})
+watch(
+  () => signalRStore.gameConnectionId,
+  (newId) => {
+    console.log('gameConnectionId zmienione na:', newId)
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
@@ -1488,5 +1559,10 @@ watch(() => signalRStore.gameConnectionId, (newId) => {
 .result-overlay-enter-from,
 .result-overlay-leave-to {
   opacity: 0;
+}
+
+.row--selectable:hover {
+  box-shadow: 0 0 12px rgba(255, 215, 64, 0.4);
+  cursor: pointer;
 }
 </style>

@@ -73,7 +73,7 @@ interface SignalRState {
 
   game: GameState | null
   myTurn: boolean
-  pendingAction: 'agility' | 'resurrection' | 'decoy' | null
+  pendingAction: 'agility' | 'resurrection' | 'decoy' | 'horn' | null
   pendingCardId: number | null
 
   selectedFraction: number | null
@@ -321,6 +321,11 @@ export const useSignalRStore = defineStore('signalr', {
         this.pendingAction = 'decoy';
         this.pendingCardId = cardId;
       });
+
+      conn.on('RequestHornRow', (cardId: number) => {
+        this.pendingAction = 'horn'
+        this.pendingCardId = cardId
+      })
     },
 
     async startGame(fraction1: number, fraction2: number) {
@@ -365,6 +370,16 @@ export const useSignalRStore = defineStore('signalr', {
     async resolveDecoy(targetCardId: number) {
       if (!this.gameConnection || !this.roomId) throw new Error('Brak połączenia')
       await this.gameConnection.invoke('ResolveDecoy', this.roomId, targetCardId)
+      this.pendingAction = null
+    },
+
+    async resolveHorn(row: number) {
+      console.log('Kliknięto horn row:', row)
+
+      if (!this.gameConnection || !this.roomId) return
+
+      await this.gameConnection.invoke('ResolveHorn', this.roomId, row)
+
       this.pendingAction = null
     },
 
