@@ -303,6 +303,66 @@
         </div>
       </div>
 
+      <!-- ═══ DIALOG: Losowe wskrzeszenie (Najezdnik Północy) ═══ -->
+      <v-dialog v-model="showRandomResurrectionDialog" max-width="400" persistent>
+        <v-card class="gwint-dialog" rounded="xl" elevation="0">
+          <v-card-title class="pa-6 pb-2">Losowe wskrzeszenie</v-card-title>
+          <v-card-text class="pa-6">
+            <p class="text-medium-emphasis mb-4">
+              Pasywka <strong>Najezdnika Północy</strong> wskrzesiła losową kartę z cmentarza:
+            </p>
+            <div class="d-flex justify-center">
+              <GameCard
+                v-if="signalRStore.randomResurrectionCard"
+                :card="signalRStore.randomResurrectionCard"
+                :playable="false"
+              />
+            </div>
+          </v-card-text>
+          <v-card-actions class="pa-4 justify-center">
+            <v-btn
+              color="amber-darken-2"
+              variant="elevated"
+              prepend-icon="mdi-check"
+              @click="confirmRandomResurrection"
+            >
+              Rozumiem
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- ═══ DIALOG: Podgląd kart przeciwnika (Cesarz Nilfgaardu) ═══ -->
+      <v-dialog v-model="showRevealDialog" max-width="600" persistent>
+        <v-card class="gwint-dialog" rounded="xl" elevation="0">
+          <v-card-title class="pa-6 pb-2">Podgląd ręki przeciwnika</v-card-title>
+          <v-card-text class="pa-6">
+            <p class="text-medium-emphasis mb-4">
+              Zdolność Cesarza Nilfgaardu ujawnia 3 losowe karty z ręki
+              <strong>{{ signalRStore.opponentPlayer?.login ?? 'przeciwnika' }}</strong>:
+            </p>
+            <div class="d-flex flex-wrap ga-3 justify-center">
+              <GameCard
+                v-for="card in signalRStore.revealedOpponentCards"
+                :key="card.id"
+                :card="card"
+                :playable="false"
+              />
+            </div>
+          </v-card-text>
+          <v-card-actions class="pa-4 justify-center">
+            <v-btn
+              color="amber-darken-2"
+              variant="elevated"
+              prepend-icon="mdi-check"
+              @click="confirmReveal"
+            >
+              Rozumiem
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
       <!-- ═══ DIALOG: Wybór rzędu (Zwinność) ═══ -->
       <v-dialog v-model="showAgilityDialog" max-width="400" persistent>
         <v-card class="gwint-dialog" rounded="xl" elevation="0">
@@ -598,6 +658,19 @@ const hornRows = [
   { label: 'Dystans', value: 2, color: 'green-lighten-2' },
   { label: 'Oblężenie', value: 3, color: 'blue-lighten-2' },
 ]
+
+const showRevealDialog = computed(() => signalRStore.pendingAction === 'revealCards')
+
+const showRandomResurrectionDialog = computed(() => signalRStore.pendingAction === 'revealResurrection')
+
+async function confirmRandomResurrection() {
+  signalRStore.randomResurrectionCard = null
+  signalRStore.pendingAction = null
+}
+
+async function confirmReveal() {
+  await signalRStore.confirmReveal()
+}
 
 // Aktualizuj numer rundy na podstawie wygranych rund
 watch([myRoundsWon, opponentRoundsWon], () => {
