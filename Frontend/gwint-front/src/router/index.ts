@@ -63,6 +63,7 @@ const router = createRouter({
       name: 'Room',
       component: Room,
     },
+    { path: '/deck-builder', name: 'deck-builder', component: () => import('@/pages/Deckbuilderview.vue') },
   ],
 })
 

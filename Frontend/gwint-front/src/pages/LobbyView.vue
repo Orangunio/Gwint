@@ -25,6 +25,20 @@
             </v-card>
 
             <template v-else>
+              <!-- Przycisk Edytuj Talię -->
+              <div class="text-center mb-6">
+                <v-btn
+                  color="amber-darken-2"
+                  variant="outlined"
+                  size="large"
+                  prepend-icon="mdi-cards-outline"
+                  @click="goToDeckBuilder"
+                  class="mb-4"
+                >
+                  Edytuj swoją talię
+                </v-btn>
+              </div>
+
               <!-- === EKRAN OCZEKIWANIA W POKOJU === -->
               <v-card
                 v-if="phase === 'waiting'"
@@ -53,7 +67,6 @@
 
                 <v-divider class="mb-6" />
 
-                <!-- Lista graczy aktualizowana w czasie rzeczywistym -->
                 <div class="waiting-players mb-6">
                   <div
                     v-for="i in 2"
@@ -73,7 +86,6 @@
                 </div>
 
                 <v-btn
-                  data-testid="start-room-game-button"
                   v-if="isRoomReady"
                   color="amber-darken-2"
                   size="x-large"
@@ -91,7 +103,6 @@
                 </div>
 
                 <v-btn
-                  data-testid="leave-room-button"
                   variant="text"
                   size="small"
                   class="mt-4"
@@ -173,7 +184,6 @@
                     />
                     <div class="d-flex ga-3">
                       <v-btn
-                        data-testid="join-submit-button"
                         color="blue-lighten-2"
                         :loading="isJoining"
                         :disabled="joinCode.length < 6"
@@ -232,11 +242,11 @@ const joinCode = ref('')
 const isJoining = ref(false)
 const isStarting = ref(false)
 
-// Lista graczy aktualizowana przez SignalR w czasie rzeczywistym
+// Lista graczy
 const players = ref<string[]>([])
 const isRoomReady = computed(() => players.value.length >= 2)
 
-// ====================== HANDLERY ZDARZEŃ SIGNALR ======================
+// ====================== SIGNALR ======================
 
 function onPlayersUpdated(logins: string[]) {
   players.value = logins
@@ -290,16 +300,17 @@ onUnmounted(() => {
 
 // ====================== AKCJE ======================
 
+function goToDeckBuilder() {
+  router.push({ name: 'deck-builder' }) // <-- zmień nazwę route jeśli jest inna
+}
+
 async function handleCreate() {
   try {
     if (!signalRStore.isConnected) {
       await signalRStore.connectToRoom()
     }
 
-    // createRoom() ustawia isHost = true i zapisuje roomId w store
     const roomId = await signalRStore.createRoom(playerStore.displayName)
-
-    // Pobierz aktualną listę graczy (twórca od razu jest w pokoju)
     await signalRStore.roomConnection?.invoke('GetPlayers', roomId)
 
     phase.value = 'waiting'
@@ -320,8 +331,6 @@ async function handleJoin() {
       await signalRStore.connectToRoom()
     }
 
-    // joinRoom() ustawia isHost = false i zapisuje roomId w store
-    // Serwer powinien rozesłać PlayersUpdated do wszystkich w pokoju
     await signalRStore.joinRoom(code, playerStore.displayName)
 
     joinCode.value = ''
@@ -368,6 +377,7 @@ function copyRoomId() {
 </script>
 
 <style scoped>
+/* Twój istniejący styl (bez zmian) */
 .lobby-page {
   position: relative;
   min-height: 100vh;
