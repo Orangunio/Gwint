@@ -21,13 +21,49 @@ namespace BackendTests.Tests.HubsTests
         }
 
         private GameHub GetHub(GwintDBContext db, GameUseCases gameUseCases,
-            out Mock<IHubCallerClients> clientsMock)
+            out Mock<IHubCallerClients> clientsMock,
+            string connectionId = "conn-test")
         {
             clientsMock = new Mock<IHubCallerClients>();
 
+            // Caller (dla SendAsync("Error", ...) w tras błędów)
+            var callerMock = new Mock<ISingleClientProxy>();
+            callerMock
+                .Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+            clientsMock.Setup(c => c.Caller).Returns(callerMock.Object);
+
+            // Wszystkie Group(...) wpadają w jeden mock (nadpisywany w testach przez Setup)
+            var defaultGroupProxy = new Mock<IClientProxy>();
+            defaultGroupProxy
+                .Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+            clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(defaultGroupProxy.Object);
+
+            // OthersInGroup (używane przez BroadcastFraction itp.)
+            clientsMock.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(defaultGroupProxy.Object);
+
+            // Pojedyncze Client(...) – używane np. dla ScoiataelChooseFirstPlayer
+            var clientProxy = new Mock<ISingleClientProxy>();
+            clientProxy
+                .Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+            clientsMock.Setup(c => c.Client(It.IsAny<string>())).Returns(clientProxy.Object);
+
+            var groupsMock = new Mock<IGroupManager>();
+            groupsMock.Setup(g => g.AddToGroupAsync(It.IsAny<string>(), It.IsAny<string>(), default))
+                .Returns(Task.CompletedTask);
+            groupsMock.Setup(g => g.RemoveFromGroupAsync(It.IsAny<string>(), It.IsAny<string>(), default))
+                .Returns(Task.CompletedTask);
+
+            var contextMock = new Mock<HubCallerContext>();
+            contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
+
             var hub = new GameHub(gameUseCases, db)
             {
-                Clients = clientsMock.Object
+                Clients = clientsMock.Object,
+                Groups = groupsMock.Object,
+                Context = contextMock.Object
             };
 
             RoomHub.rooms.Clear();
@@ -37,9 +73,15 @@ namespace BackendTests.Tests.HubsTests
         }
 
         private GwintDBContext SeedDatabase(string dbName, int player1Id, int player2Id,
-            Fractions p1Fraction, Fractions p2Fraction)
+            Fractions p1Fraction, Fractions p2Fraction,
+            string p1Login = "Player1", string p2Login = "Player2")
         {
             var db = GetDbContext(dbName);
+
+            // Bez wpisów w Players GameHub.StartGame zwróci "Nie znaleziono graczy w bazie".
+            db.Players.Add(new Player { Id = player1Id, Login = p1Login, HashPassword = "hash1" });
+            db.Players.Add(new Player { Id = player2Id, Login = p2Login, HashPassword = "hash2" });
+            db.SaveChanges();
 
             var commander1 = new Card("Commander1", p1Fraction, Abilities.brak, 10, Place.FirstRow, true, true, false);
             db.Cards.Add(commander1);
@@ -187,8 +229,8 @@ namespace BackendTests.Tests.HubsTests
             await hub.StartGame("room1", Fractions.Nilfgaard, Fractions.NorthernRealms);
 
             gameUseCases.games.TryGetValue("room1", out var game);
-            Assert.DoesNotContain(game.Player1CardInDeck, c => c.isCommander);
-            Assert.DoesNotContain(game.Player2CardInDeck, c => c.isCommander);
+            Assert.DoesNotContain(game.Player1CardsInDeck, c => c.isCommander);
+            Assert.DoesNotContain(game.Player2CardsInDeck, c => c.isCommander);
         }
 
         // ─── ChooseFirstPlayer ────────────────────────────────────────────────────
@@ -362,10 +404,11 @@ namespace BackendTests.Tests.HubsTests
             await hub.StartGame("room1", Fractions.Nilfgaard, Fractions.NorthernRealms);
             await hub.SetFirstPlayer("room1", "conn1");
 
-            var normalCard = new Card("Unit", Fractions.Nilfgaard, Abilities.brak, 5, Place.FirstRow, false, false, false);
-            await hub.PlayCard("room1", normalCard);
-
+            // PlayCard zignoruje kartę spoza ręki; bierzemy więc realną z ręki gracza 1.
             gameUseCases.games.TryGetValue("room1", out var game);
+            var cardInHand = game.Player1CardsOnHand.First(c => !c.isCommander && !c.isSpecial);
+            await hub.PlayCard("room1", cardInHand);
+
             Assert.Equal("conn2", game.CurrentPlayer.ConnectionId);
         }
 
@@ -396,8 +439,9 @@ namespace BackendTests.Tests.HubsTests
                 .Returns(Task.CompletedTask);
             clientsMock.Setup(c => c.Group("room1")).Returns(clientProxyMock.Object);
 
-            var normalCard = new Card("Unit", Fractions.Nilfgaard, Abilities.brak, 5, Place.FirstRow, false, false, false);
-            await hub.PlayCard("room1", normalCard);
+            gameUseCases.games.TryGetValue("room1", out var game);
+            var cardInHand = game.Player1CardsOnHand.First(c => !c.isCommander && !c.isSpecial);
+            await hub.PlayCard("room1", cardInHand);
 
             Assert.True(nextTurnCalled);
         }

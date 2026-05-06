@@ -45,9 +45,12 @@ namespace Backend.Tests.ControllersTests
             var result = await controller.CreatePlayer(body) as OkObjectResult;
 
             Assert.NotNull(result);
-            var player = result.Value as Player;
-            Assert.NotNull(player);
-            Assert.Equal("testuser", player.Login);
+            Assert.NotNull(result.Value);
+
+            // Endpoint rejestracji zwraca anonimowy obiekt { Id, Login } (bez hasha hasła).
+            var loginProp = result.Value.GetType().GetProperty("Login");
+            Assert.NotNull(loginProp);
+            Assert.Equal("testuser", loginProp.GetValue(result.Value) as string);
         }
 
         [Fact]

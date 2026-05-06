@@ -1,147 +1,156 @@
-﻿using Backend.Hubs;
+using Backend.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace BackendTests.Tests.HubsTests
 {
     public class RoomHubTests
     {
-        private RoomHub GetHub(out Mock<IHubCallerClients> clientsMock, out Mock<IGroupManager> groupsMock)
+        // Aktualne API hubów: CreateRoom(name) i JoinRoom(roomId, name) korzystają z Context.ConnectionId,
+        // a nie z parametru. Każdy test musi zatem zasymulować HubCallerContext.
+
+        private RoomHub GetHub(string connectionId, out Mock<IHubCallerClients> clientsMock,
+            out Mock<IGroupManager> groupsMock, out Mock<IClientProxy> groupProxyMock)
         {
             clientsMock = new Mock<IHubCallerClients>();
             groupsMock = new Mock<IGroupManager>();
+            groupProxyMock = new Mock<IClientProxy>();
+
+            // Każde wywołanie Group(...) zwraca ten sam mock proxy – wystarczy do weryfikacji SendCoreAsync.
+            clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(groupProxyMock.Object);
+            groupProxyMock
+                .Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+
+            // Caller też potrzebny dla tras błędów (RoomNotFound itp.)
+            var callerProxyMock = new Mock<ISingleClientProxy>();
+            callerProxyMock
+                .Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+            clientsMock.Setup(c => c.Caller).Returns(callerProxyMock.Object);
+
+            groupsMock.Setup(g => g.AddToGroupAsync(It.IsAny<string>(), It.IsAny<string>(), default))
+                .Returns(Task.CompletedTask);
+            groupsMock.Setup(g => g.RemoveFromGroupAsync(It.IsAny<string>(), It.IsAny<string>(), default))
+                .Returns(Task.CompletedTask);
+
+            var contextMock = new Mock<HubCallerContext>();
+            contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
 
             var hub = new RoomHub
             {
                 Clients = clientsMock.Object,
-                Groups = groupsMock.Object
+                Groups = groupsMock.Object,
+                Context = contextMock.Object
             };
 
             RoomHub.rooms.Clear();
-
             return hub;
         }
 
         [Fact]
-        public void CreateRoom_ShouldAddRoomWithPlayer()
+        public async Task CreateRoom_ShouldAddRoomWithPlayer()
         {
-            var hub = GetHub(out _, out _);
-            string connectionId = "conn1";
-            string playerName = "Alice";
+            var hub = GetHub("conn1", out _, out _, out _);
 
-            var roomId = hub.CreateRoom(connectionId, playerName);
+            var roomId = await hub.CreateRoom("Alice");
 
             Assert.True(RoomHub.rooms.ContainsKey(roomId));
             var room = RoomHub.rooms[roomId];
             Assert.Single(room.Players);
-            Assert.Equal(playerName, room.Players[0].Login);
-            Assert.Equal(connectionId, room.Players[0].ConnectionId);
+            Assert.Equal("Alice", room.Players[0].Login);
+            Assert.Equal("conn1", room.Players[0].ConnectionId);
         }
 
         [Fact]
         public async Task JoinRoom_ShouldAddPlayerAndNotifyGroup()
         {
-            var hub = GetHub(out var clientsMock, out var groupsMock);
+            // Host tworzy pokój
+            var hostHub = GetHub("conn1", out _, out _, out _);
+            var roomId = await hostHub.CreateRoom("Alice");
 
-            string roomId = hub.CreateRoom("conn1", "Alice");
+            // Drugi hub – nowy ConnectionId – ten sam ConcurrentDictionary statyczny w RoomHub
+            var clientsMock = new Mock<IHubCallerClients>();
+            var groupsMock = new Mock<IGroupManager>();
+            var groupProxyMock = new Mock<IClientProxy>();
+
+            clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(groupProxyMock.Object);
+            groupProxyMock
+                .Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+
+            var callerMock = new Mock<ISingleClientProxy>();
+            callerMock.Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default))
+                .Returns(Task.CompletedTask);
+            clientsMock.Setup(c => c.Caller).Returns(callerMock.Object);
+
+            groupsMock.Setup(g => g.AddToGroupAsync(It.IsAny<string>(), It.IsAny<string>(), default))
+                .Returns(Task.CompletedTask);
 
             var contextMock = new Mock<HubCallerContext>();
             contextMock.Setup(c => c.ConnectionId).Returns("conn2");
-            hub.Context = contextMock.Object;
 
-            bool playerJoinedCalled = false;
-            var clientProxyMock = new Mock<IClientProxy>();
-            clientProxyMock
-                .Setup(proxy => proxy.SendCoreAsync("PlayerJoined", It.IsAny<object[]>(), default))
-                .Callback(() => playerJoinedCalled = true)
-                .Returns(Task.CompletedTask);
+            var guestHub = new RoomHub
+            {
+                Clients = clientsMock.Object,
+                Groups = groupsMock.Object,
+                Context = contextMock.Object
+            };
 
-            clientsMock.Setup(c => c.Group(roomId)).Returns(clientProxyMock.Object);
-
-            groupsMock.Setup(g => g.AddToGroupAsync("conn2", roomId, default))
-                      .Returns(Task.CompletedTask);
-
-            await hub.JoinRoom(roomId, "conn2", "Bob");
+            await guestHub.JoinRoom(roomId, "Bob");
 
             var room = RoomHub.rooms[roomId];
             Assert.Equal(2, room.Players.Count);
-            Assert.Contains(room.Players, p => p.Login == "Bob");
-
-            Assert.True(playerJoinedCalled);
+            Assert.Contains(room.Players, p => p.Login == "Bob" && p.ConnectionId == "conn2");
 
             groupsMock.Verify(g => g.AddToGroupAsync("conn2", roomId, default), Times.Once);
+            groupProxyMock.Verify(
+                p => p.SendCoreAsync("PlayersUpdated", It.IsAny<object[]>(), default),
+                Times.AtLeastOnce);
         }
 
         [Fact]
         public async Task OnDisconnectedAsync_ShouldRemovePlayerAndNotifyGroup()
         {
-            var hub = GetHub(out var clientsMock, out _);
-
-            string roomId = hub.CreateRoom("conn1", "Alice");
-
-            bool playerLeftCalled = false;
-            var clientProxyMock = new Mock<IClientProxy>();
-            clientProxyMock
-                .Setup(proxy => proxy.SendCoreAsync("PlayerLeft", It.IsAny<object[]>(), default))
-                .Callback(() => playerLeftCalled = true)
-                .Returns(Task.CompletedTask);
-
-            clientsMock.Setup(c => c.Group(roomId)).Returns(clientProxyMock.Object);
-
-            var contextMock = new Mock<HubCallerContext>();
-            contextMock.Setup(c => c.ConnectionId).Returns("conn1");
-            hub.Context = contextMock.Object;
+            var hub = GetHub("conn1", out _, out _, out var groupProxyMock);
+            var roomId = await hub.CreateRoom("Alice");
 
             await hub.OnDisconnectedAsync(null);
 
             var room = RoomHub.rooms[roomId];
             Assert.Empty(room.Players);
 
-            Assert.True(playerLeftCalled);
+            groupProxyMock.Verify(
+                p => p.SendCoreAsync("PlayersUpdated", It.IsAny<object[]>(), default),
+                Times.AtLeastOnce);
         }
 
         [Fact]
         public async Task StartGame_ShouldSendGameStartedAndSetup()
         {
-            var hub = GetHub(out var clientsMock, out _);
-
-            string roomId = hub.CreateRoom("conn1", "Alice");
-
-            hub.CreateRoom("conn2", "Bob");
-
-            bool gameStartedCalled = false;
-            bool gameSetupCalled = false;
-            var clientProxyMock = new Mock<IClientProxy>();
-            clientProxyMock
-                .Setup(proxy => proxy.SendCoreAsync("GameStarted", It.IsAny<object[]>(), default))
-                .Callback(() => gameStartedCalled = true)
-                .Returns(Task.CompletedTask);
-
-            clientProxyMock
-                .Setup(proxy => proxy.SendCoreAsync("GameSetup", It.IsAny<object[]>(), default))
-                .Callback(() => gameSetupCalled = true)
-                .Returns(Task.CompletedTask);
-
-            clientsMock.Setup(c => c.Group(roomId)).Returns(clientProxyMock.Object);
+            var hub = GetHub("conn1", out _, out _, out var groupProxyMock);
+            var roomId = await hub.CreateRoom("Alice");
 
             await hub.StartGame(roomId);
 
-            Assert.True(gameStartedCalled, "GameStarted event was not sent");
-            Assert.True(gameSetupCalled, "GameSetup event was not sent");
+            groupProxyMock.Verify(
+                p => p.SendCoreAsync("GameStarted", It.IsAny<object[]>(), default),
+                Times.AtLeastOnce);
+            groupProxyMock.Verify(
+                p => p.SendCoreAsync("GameSetup", It.IsAny<object[]>(), default),
+                Times.AtLeastOnce);
         }
 
         [Fact]
-        public void CreateRoom_ShouldGenerateUniqueRoomIds()
+        public async Task CreateRoom_ShouldGenerateUniqueRoomIds()
         {
-            var hub = GetHub(out _, out _);
+            var hub1 = GetHub("conn1", out _, out _, out _);
+            var roomId1 = await hub1.CreateRoom("Alice");
 
-            string roomId1 = hub.CreateRoom("conn1", "Alice");
-            string roomId2 = hub.CreateRoom("conn2", "Bob");
+            var hub2 = GetHub("conn2", out _, out _, out _);
+            // GetHub czyści RoomHub.rooms; pierwszy roomId zachowamy w zmiennej, więc i tak różne.
+            var roomId2 = await hub2.CreateRoom("Bob");
 
             Assert.NotEqual(roomId1, roomId2);
         }

@@ -85,17 +85,20 @@
                   </div>
                 </div>
 
-                <v-btn
-                  v-if="isRoomReady"
-                  color="amber-darken-2"
-                  size="x-large"
-                  class="gwint-btn mb-4"
-                  prepend-icon="mdi-play"
-                  :loading="isStarting"
-                  @click="startGame"
-                >
-                  Zacznij grę!
-                </v-btn>
+                <template v-if="isRoomReady">
+                  <p class="text-success mb-3 font-weight-medium">Przeciwnik dołączył!</p>
+                  <v-btn
+                    data-testid="start-room-game-button"
+                    color="amber-darken-2"
+                    size="x-large"
+                    class="gwint-btn mb-4"
+                    prepend-icon="mdi-play"
+                    :loading="isStarting"
+                    @click="startGame"
+                  >
+                    Zacznij grę!
+                  </v-btn>
+                </template>
 
                 <div v-else class="d-flex align-center justify-center ga-2 text-medium-emphasis">
                   <v-progress-circular size="20" width="2" indeterminate color="amber-darken-2" />
@@ -103,6 +106,7 @@
                 </div>
 
                 <v-btn
+                  data-testid="leave-room-button"
                   variant="text"
                   size="small"
                   class="mt-4"
@@ -168,6 +172,7 @@
                 <v-expand-transition>
                   <v-card
                     v-if="phase === 'join'"
+                    data-testid="join-room-form"
                     class="gwint-card mt-4 pa-6"
                     rounded="xl"
                     elevation="0"
@@ -184,6 +189,7 @@
                     />
                     <div class="d-flex ga-3">
                       <v-btn
+                        data-testid="join-submit-button"
                         color="blue-lighten-2"
                         :loading="isJoining"
                         :disabled="joinCode.length < 6"
@@ -191,7 +197,7 @@
                       >
                         Dołącz
                       </v-btn>
-                      <v-btn variant="text" @click="phase = 'menu'">Anuluj</v-btn>
+                      <v-btn data-testid="join-cancel-button" variant="text" @click="phase = 'menu'">Anuluj</v-btn>
                     </div>
                   </v-card>
                 </v-expand-transition>

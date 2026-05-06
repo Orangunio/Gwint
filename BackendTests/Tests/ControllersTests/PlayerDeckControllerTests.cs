@@ -63,7 +63,7 @@ namespace Backend.Tests.ControllersTests
             var db = GetDbContext();
             var controller = new PlayerDeckController(db);
 
-            var result = await controller.GetPlayerDecks(1, 1) as OkObjectResult;
+            var result = await controller.GetPlayerFractionDeck(1, 1) as OkObjectResult;
 
             Assert.NotNull(result);
             var decks = result.Value as IEnumerable<object>;
@@ -77,7 +77,7 @@ namespace Backend.Tests.ControllersTests
             var db = GetDbContext();
             var controller = new PlayerDeckController(db);
 
-            var result = await controller.GetPlayerDecks(1, 99);
+            var result = await controller.GetPlayerFractionDeck(1, 99);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
