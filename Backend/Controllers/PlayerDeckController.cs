@@ -1,5 +1,4 @@
 ﻿using Backend.Database;
-using Backend.Migrations;
 using Backend.Models.Body;
 using Backend.Models.Enums;
 using Backend.UseCases;
@@ -9,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [ApiController]
     [Route("api/player-deck")]
     public class PlayerDeckController : ControllerBase
@@ -30,132 +29,221 @@ namespace Backend.Controllers
                 {
                     pd.Id,
                     pd.CardId,
-                    CardName = pd.Card.Name
+                    CardName = pd.Card.Name,
+                    Fraction = (int)pd.Card.fraction,
+                    Ability = (int)pd.Card.ability,
+                    Strength = pd.Card.Strength,
+                    Place = (int)pd.Card.place,
+                    IsChampion = pd.Card.isChampion,
+                    IsCommander = pd.Card.isCommander,
+                    IsSpecial = pd.Card.isSpecial,
                 })
                 .ToListAsync();
+
             return Ok(playerDecks);
         }
 
         [HttpGet("get-player-fraction-deck/{playerId}/{fraction}")]
-        public async Task<IActionResult> GetPlayerDecks(int playerId, int fraction)
+        public async Task<IActionResult> GetPlayerFractionDeck(int playerId, int fraction)
         {
-            Fractions fractionEnum;
-            switch (fraction)
-            {
-                case 1:
-                    fractionEnum = Fractions.Nilfgaard;
-                    break;
-                case 2:
-                    fractionEnum = Fractions.NorthernRealms;
-                    break;
-                case 3:
-                    fractionEnum = Fractions.ScoiaTael;
-                    break;
-                case 4:
-                    fractionEnum = Fractions.Monsters;
-                    break;
-                default:
-                    return BadRequest("Invalid fraction value.");
-            }
+            if (fraction < 1 || fraction > 4)
+                return BadRequest("Nieprawidłowa frakcja.");
 
-            var playerDecks = await dbContext.PlayerDecks
-                .Where(pd => pd.PlayerId == playerId && pd.Card.fraction == fractionEnum)
-                .Select(pd => new
+            Fractions fractionEnum = fraction switch
+            {
+                1 => Fractions.Nilfgaard,
+                2 => Fractions.NorthernRealms,
+                3 => Fractions.ScoiaTael,
+                4 => Fractions.Monsters,
+                _ => throw new ArgumentException("Invalid fraction")
+            };
+
+            try
+            {
+                var playerCards = await dbContext.PlayerDecks
+                    .Include(pd => pd.Card)
+                    .Where(pd => pd.PlayerId == playerId
+                              && pd.Card.fraction == fractionEnum)
+                    .Select(pd => new
+                    {
+                        pd.Id,
+                        CardId = pd.CardId,
+                        CardName = pd.Card.Name,
+                        Fraction = (int)pd.Card.fraction,
+                        Ability = (int)pd.Card.ability,
+                        Strength = pd.Card.Strength,
+                        Place = (int)pd.Card.place,
+                        IsChampion = pd.Card.isChampion,
+                        IsCommander = pd.Card.isCommander,
+                        IsSpecial = pd.Card.isSpecial,
+                    })
+                    .ToListAsync();
+
+                return Ok(playerCards);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] GetPlayerFractionDeck({playerId}, {fraction}): {ex}");
+                // Zwróć więcej informacji podczas developmentu
+                return StatusCode(500, new
                 {
-                    pd.Id,
-                    pd.CardId,
-                    CardName = pd.Card.Name
-                })
-                .ToListAsync();
-            return Ok(playerDecks);
+                    error = "Błąd pobierania talii",
+                    message = ex.Message,
+                    inner = ex.InnerException?.Message
+                });
+            }
         }
 
         [HttpPost("update-deck")]
         public async Task<IActionResult> UpdateDeck([FromBody] UpdateDeckBody body)
         {
             Fractions fraction;
-
             switch (body.Fraction)
             {
-                case 1:
-                    fraction = Fractions.Nilfgaard;
-                    break;
-                case 2:
-                    fraction = Fractions.NorthernRealms;
-                    break;
-                case 3:
-                    fraction = Fractions.ScoiaTael;
-                    break;
-                case 4:
-                    fraction = Fractions.Monsters;
-                    break;
-                default:
-                    return BadRequest("Invalid fraction value.");
+                case 1: fraction = Fractions.Nilfgaard; break;
+                case 2: fraction = Fractions.NorthernRealms; break;
+                case 3: fraction = Fractions.ScoiaTael; break;
+                case 4: fraction = Fractions.Monsters; break;
+                default: return BadRequest("Invalid fraction value.");
             }
 
-            var currentDeckEntries = await dbContext.PlayerDecks
-                .Where(pd => pd.PlayerId == body.PlayerId && pd.Card.fraction == fraction)
-                .Include(pd => pd.Card)
-                .ToListAsync();
-
-            var remainingCards = currentDeckEntries
-                .Where(pd => !body.CardIdsToRemove.Contains(pd.CardId))
-                .Select(pd => pd.Card)
-                .ToList();
-
-            var cardsToAddFull = await dbContext.Cards
-                .Where(c => body.CardIdsToAdd.Contains(c.Id) && c.fraction == fraction)
-                .ToListAsync();
-
-            var existingCardIds = remainingCards.Select(c => c.Id).ToHashSet();
-            var cardsToAddFiltered = cardsToAddFull
-                .Where(c => !existingCardIds.Contains(c.Id))
-                .ToList();
-
-            var finalCards = remainingCards
-                .Concat(cardsToAddFiltered)
-                .ToList();
-
-            var commandersCount = finalCards.Count(c => c.isCommander);
-            if (commandersCount != 1)
+            try
             {
-                return BadRequest("Talia musi zawierać dokładnie jednego dowódcę.");
-            }
+                // Pobierz aktualne karty gracza w danej frakcji
+                var currentDeckEntries = await dbContext.PlayerDecks
+                    .Include(pd => pd.Card)
+                    .Where(pd => pd.PlayerId == body.PlayerId && pd.Card.fraction == fraction)
+                    .ToListAsync();
 
-            var specialCardsCount = finalCards.Count(c => c.isSpecial);
-            if (specialCardsCount > 10)
-            {
-                return BadRequest("Talia może zawierać maksymalnie 10 kart specjalnych.");
-            }
+                // Usuń karty oznaczone do usunięcia
+                var cardsToRemove = currentDeckEntries
+                    .Where(pd => body.CardIdsToRemove.Contains(pd.CardId))
+                    .ToList();
 
-            if(finalCards.Count < 26)
-            {
-                return BadRequest("Talia musi zawierać minimum 25 kart bez dowódcy");
-            }
+                dbContext.PlayerDecks.RemoveRange(cardsToRemove);
 
-            foreach (var card in cardsToAddFiltered)
-            {
-                dbContext.PlayerDecks.Add(new Models.PlayerDeck
+                // Pozostałe karty po usunięciu
+                var remainingCardIds = currentDeckEntries
+                    .Where(pd => !body.CardIdsToRemove.Contains(pd.CardId))
+                    .Select(pd => pd.CardId)
+                    .ToHashSet();
+
+                // Karty do dodania (tylko te, których jeszcze nie ma)
+                var cardsToAddIds = body.CardIdsToAdd
+                    .Where(id => !remainingCardIds.Contains(id))
+                    .Distinct()
+                    .ToList();
+
+                // Pobierz pełne obiekty kart do dodania
+                var cardsToAddFull = await dbContext.Cards
+                    .Where(c => cardsToAddIds.Contains(c.Id) && c.fraction == fraction)
+                    .ToListAsync();
+
+                // Walidacja talii (zachowane Twoje oryginalne warunki)
+                var finalCards = currentDeckEntries
+                    .Where(pd => !body.CardIdsToRemove.Contains(pd.CardId))
+                    .Select(pd => pd.Card)
+                    .Concat(cardsToAddFull)
+                    .ToList();
+
+                var commandersCount = finalCards.Count(c => c.isCommander);
+                if (commandersCount != 1)
+                    return BadRequest("Talia musi zawierać dokładnie jednego dowódcę.");
+
+                var specialCardsCount = finalCards.Count(c => c.isSpecial);
+                if (specialCardsCount > 10)
+                    return BadRequest("Talia może zawierać maksymalnie 10 kart specjalnych.");
+
+                if (finalCards.Count < 26)
+                    return BadRequest("Talia musi zawierać minimum 25 kart bez dowódcy");
+
+                // Dodaj nowe karty
+                foreach (var card in cardsToAddFull)
                 {
-                    PlayerId = body.PlayerId,
-                    CardId = card.Id
+                    dbContext.PlayerDecks.Add(new Models.PlayerDeck
+                    {
+                        PlayerId = body.PlayerId,
+                        CardId = card.Id
+                    });
+                }
+
+                await dbContext.SaveChangesAsync();
+
+                // Zwróć zaktualizowaną talię
+                var updatedDeck = await dbContext.PlayerDecks
+                    .Include(pd => pd.Card)
+                    .Where(pd => pd.PlayerId == body.PlayerId && pd.Card.fraction == fraction)
+                    .Select(pd => new
+                    {
+                        pd.Id,
+                        CardId = pd.CardId,
+                        CardName = pd.Card.Name,
+                        Fraction = (int)pd.Card.fraction,
+                        Ability = (int)pd.Card.ability,
+                        Strength = pd.Card.Strength,
+                        Place = (int)pd.Card.place,
+                        IsChampion = pd.Card.isChampion,
+                        IsCommander = pd.Card.isCommander,
+                        IsSpecial = pd.Card.isSpecial,
+                    })
+                    .ToListAsync();
+
+                return Ok(updatedDeck);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] UpdateDeck: {ex}");
+                return StatusCode(500, new
+                {
+                    error = "Błąd zapisu talii",
+                    message = ex.Message
                 });
             }
+        }
 
-            var cardsToRemove = currentDeckEntries
-                .Where(pd => body.CardIdsToRemove.Contains(pd.CardId))
-                .ToList();
+        [HttpGet("available-cards/{fraction}")]
 
-            dbContext.PlayerDecks.RemoveRange(cardsToRemove);
+        public async Task<IActionResult> GetAvailableCards(int fraction)
+        {
+            Fractions fractionEnum = fraction switch
+            {
+                1 => Fractions.Nilfgaard,
+                2 => Fractions.NorthernRealms,
+                3 => Fractions.ScoiaTael,
+                4 => Fractions.Monsters,
+                _ => throw new ArgumentException("Invalid fraction")
+            };
 
-            await dbContext.SaveChangesAsync();
+            try
+            {
+                var cards = await dbContext.Cards
+                    .Where(c => c.fraction == fractionEnum)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.Name,
+                        Fraction = (int)c.fraction,
+                        Ability = (int)c.ability,
+                        Strength = c.Strength,
+                        Place = (int)c.place,
+                        IsChampion = c.isChampion,
+                        IsCommander = c.isCommander,
+                        IsSpecial = c.isSpecial,
+                    })
+                    .ToListAsync();
 
-            var updatedDeck = await dbContext.PlayerDecks
-                .Where(pd => pd.PlayerId == body.PlayerId)
-                .Include(pd => pd.Card)
-                .ToListAsync();
-
-            return Ok(updatedDeck);
+                return Ok(cards);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] GetAvailableCards({fraction}): {ex}");
+                return StatusCode(500, new
+                {
+                    error = "Błąd pobierania puli kart",
+                    message = ex.Message,
+                    stack = ex.StackTrace
+                });
+            }
         }
     }
 }

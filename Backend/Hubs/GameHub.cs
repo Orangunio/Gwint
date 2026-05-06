@@ -104,8 +104,11 @@ namespace Backend.Hubs
             game.Player1CardsInDeck = GameUseCases.Shuffle(player1Deck);
             game.Player2CardsInDeck = GameUseCases.Shuffle(player2Deck);
 
-            game.Player1CardsOnHand = game.Player1CardsInDeck.ToList();
-            game.Player2CardsOnHand = game.Player2CardsInDeck.ToList();
+            game.Player1CardsOnHand = game.Player1CardsInDeck.Take(10).ToList();
+            game.Player2CardsOnHand = game.Player2CardsInDeck.Take(10).ToList();
+
+            game.Player1CardsInDeck = game.Player1CardsInDeck.Skip(10).ToList();
+            game.Player2CardsInDeck = game.Player2CardsInDeck.Skip(10).ToList();
 
             if (game.Board == null) game.Board = new Board();
 

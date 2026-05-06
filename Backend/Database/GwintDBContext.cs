@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Backend.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Database
 {
@@ -13,8 +14,13 @@ namespace Backend.Database
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.HasDefaultSchema("public");
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<PlayerDeck>()
+                .HasOne(pd => pd.Card)
+                .WithMany()
+                .HasForeignKey(pd => pd.CardId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
     }
