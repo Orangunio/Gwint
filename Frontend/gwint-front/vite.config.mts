@@ -38,18 +38,18 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
-    extensions: [
-      '.js',
-      '.json',
-      '.jsx',
-      '.mjs',
-      '.ts',
-      '.tsx',
-      '.vue',
-    ],
+    extensions: ['.js', '.json', '.jsx', '.mjs', '.ts', '.tsx', '.vue'],
   },
+
   server: {
     port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5006',     // ← Najlepsza opcja na dev
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
 
   test: {
@@ -57,13 +57,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/tests/setup.ts'],
     css: true,
-
     server: {
       deps: {
         inline: ['vuetify'],
       },
     },
-
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
