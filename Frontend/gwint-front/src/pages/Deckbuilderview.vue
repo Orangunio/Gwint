@@ -27,6 +27,22 @@
         <span class="fraction-tab__icon">⚔</span>
         <span class="fraction-tab__name">Królestwa Północy</span>
       </button>
+      <button
+        class="fraction-tab"
+        :class="{ 'fraction-tab--active-scoia': selectedFraction === 3 }"
+        @click="switchFraction(3)"
+      >
+        <span class="fraction-tab__icon">🍃</span>
+        <span class="fraction-tab__name">Scoia'tael</span>
+      </button>
+      <button
+        class="fraction-tab"
+        :class="{ 'fraction-tab--active-monsters': selectedFraction === 4 }"
+        @click="switchFraction(4)"
+      >
+        <span class="fraction-tab__icon">☠</span>
+        <span class="fraction-tab__name">Potwory</span>
+      </button>
     </div>
 
     <!-- ══ GŁÓWNY UKŁAD ══════════════════════════════════════════ -->
@@ -191,7 +207,7 @@
           <div class="card-tooltip__name">{{ hoveredCard.name }}</div>
           <div class="card-tooltip__row">
             <span>Frakcja</span>
-            <span>{{ hoveredCard.fraction === 1 ? 'Nilfgaard' : 'Królestwa Północy' }}</span>
+            <span>{{ FRACTION_NAMES[hoveredCard.fraction] ?? '–' }}</span>
           </div>
           <div class="card-tooltip__row">
             <span>Typ</span>
@@ -219,6 +235,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import GwintDeckCard from '@/pages/Gwintcard.vue'
+import { API_BASE_URL } from '@/api/config'
 
 // ── Typy ─────────────────────────────────────────────────────────
 
@@ -235,6 +252,13 @@ interface CardData {
 }
 
 // ── Stałe ────────────────────────────────────────────────────────
+
+const FRACTION_NAMES: Record<number, string> = {
+  1: 'Nilfgaard',
+  2: 'Królestwa Północy',
+  3: "Scoia'tael",
+  4: 'Potwory',
+}
 
 const PLACES: Record<number, { label: string; css: string }> = {
   0:   { label: '–',         css: 'place--any' },
@@ -300,10 +324,13 @@ onMounted(() => {
 
 // ── API ───────────────────────────────────────────────────────────
 
-// Pobierz ID zalogowanego gracza — dostosuj do swojego auth store
 function getPlayerId(): number {
-  // Przykład: return authStore.player.id
-  return Number(localStorage.getItem('playerId') ?? 1)
+  const id = Number(localStorage.getItem('gwint_player_id'))
+  return Number.isFinite(id) && id > 0 ? id : 0
+}
+
+function getAuthToken(): string {
+  return localStorage.getItem('gwint_token') || ''
 }
 
 async function fetchCards() {
@@ -316,11 +343,11 @@ async function fetchCards() {
 
     // 1. Pobierz karty gracza (jego aktualna talia)
     const deckRes = await fetch(
-      `http://127.0.0.1:5006/api/player-deck/get-player-fraction-deck/${playerId}/${fraction}`,
-      { 
-        headers: { 
-          Authorization: `Bearer ${localStorage.getItem('token') || ''}` 
-        } 
+      `${API_BASE_URL}/player-deck/get-player-fraction-deck/${playerId}/${fraction}`,
+      {
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`
+        }
       }
     )
 
@@ -332,7 +359,7 @@ async function fetchCards() {
     }
 
     // 2. Pobierz pełną pulę kart frakcji
-    const poolRes = await fetch(`http://127.0.0.1:5006/api/player-deck/available-cards/${fraction}`)
+    const poolRes = await fetch(`${API_BASE_URL}/player-deck/available-cards/${fraction}`)
     if (!poolRes.ok) throw new Error('Nie udało się pobrać puli kart')
 
     const poolData: CardData[] = await poolRes.json()
@@ -370,9 +397,9 @@ async function saveDeck() {
 
     // 1. Pobierz aktualną talię gracza
     const currentDeckRes = await fetch(
-      `http://127.0.0.1:5006/api/player-deck/get-player-fraction-deck/${playerId}/${fraction}`,
+      `${API_BASE_URL}/player-deck/get-player-fraction-deck/${playerId}/${fraction}`,
       {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${getAuthToken()}` }
       }
     )
 
@@ -416,11 +443,11 @@ async function saveDeck() {
     console.log("Usuwam dowódcę:", cardIdsToRemove)
     console.log("Dodaję:", cardIdsToAdd)
 
-    const res = await fetch('http://127.0.0.1:5006/api/player-deck/update-deck', {
+    const res = await fetch(`${API_BASE_URL}/player-deck/update-deck`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+        Authorization: `Bearer ${getAuthToken()}`,
       },
       body: JSON.stringify(bodyData)
     })
@@ -622,6 +649,18 @@ function cardTypeLabel(card: CardData) {
   color: #7ab4e8;
   border-bottom-color: #4a7cba;
   background: rgba(74, 124, 186, 0.06);
+}
+
+.fraction-tab--active-scoia {
+  color: #8fd28f;
+  border-bottom-color: #4a9a4a;
+  background: rgba(74, 154, 74, 0.06);
+}
+
+.fraction-tab--active-monsters {
+  color: #d08080;
+  border-bottom-color: #a04040;
+  background: rgba(160, 64, 64, 0.06);
 }
 
 .fraction-tab__icon { font-size: 1.1rem; }

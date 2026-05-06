@@ -36,7 +36,7 @@ namespace Backend.Controllers
 
             _dbContext.Players.Add(player);
             await _dbContext.SaveChangesAsync();
-            return new OkObjectResult(player);
+            return Ok(new { player.Id, player.Login });
         }
 
         [HttpPost("login")]

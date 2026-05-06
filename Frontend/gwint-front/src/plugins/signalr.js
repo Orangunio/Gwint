@@ -2,7 +2,7 @@ import * as signalR from '@microsoft/signalr'
 import { ref } from 'vue'
 
 const connection = new signalR.HubConnectionBuilder()
-  .withUrl('https://localhost:7117/roomHub')
+  .withUrl('http://localhost:5006/roomHub')
   .withAutomaticReconnect()
   .build()
 

@@ -74,20 +74,43 @@ namespace Backend.Hubs
             }
 
             var player1Deck = await gwintDBContext.PlayerDecks
+                .AsNoTracking()
                 .Where(pd => pd.PlayerId == player1Db.Id)
                 .Select(pd => pd.Card)
                 .Where(c => c.fraction == player1SelectedFraction)
                 .ToListAsync();
 
             var player2Deck = await gwintDBContext.PlayerDecks
+                .AsNoTracking()
                 .Where(pd => pd.PlayerId == player2Db.Id)
                 .Select(pd => pd.Card)
                 .Where(c => c.fraction == player2SelectedFraction)
                 .ToListAsync();
 
+            if (player1Deck.Count == 0)
+            {
+                player1Deck = await gwintDBContext.Cards
+                    .AsNoTracking()
+                    .Where(c => c.fraction == player1SelectedFraction)
+                    .ToListAsync();
+                Console.WriteLine($"[GameHub] Player1 nie ma własnej talii dla frakcji {player1SelectedFraction} – używam pełnej puli ({player1Deck.Count} kart).");
+            }
+
+            if (player2Deck.Count == 0)
+            {
+                player2Deck = await gwintDBContext.Cards
+                    .AsNoTracking()
+                    .Where(c => c.fraction == player2SelectedFraction)
+                    .ToListAsync();
+                Console.WriteLine($"[GameHub] Player2 nie ma własnej talii dla frakcji {player2SelectedFraction} – używam pełnej puli ({player2Deck.Count} kart).");
+            }
+
             if (player1Deck.Count == 0 || player2Deck.Count == 0)
             {
-                Console.WriteLine("[GameHub] Błąd: Decki są puste.");
+                await Clients.Group(roomId).SendAsync(
+                    "Error",
+                    "Brak dostępnych kart dla wybranej frakcji – wybierz inną frakcję lub zbuduj talię w konstruktorze.");
+                return;
             }
 
             var game = new Game(player1Deck, player2Deck, player1SelectedFraction, player2SelectedFraction);

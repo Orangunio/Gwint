@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -k -s -o NUL -w \"%{http_code}\" https://localhost:7117/)",
+      "Bash(curl -s -o NUL -w \"%{http_code}\" http://localhost:5006/)",
+      "Bash(curl *)",
+      "Bash(tasklist /FI \"IMAGENAME eq Backend.exe\" /FI \"IMAGENAME eq dotnet.exe\")",
+      "Bash(cmd.exe *)",
+      "Bash(dotnet build *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('total:', len\\(d\\)\\); [print\\(c\\) for c in d if c['isCommander']]; print\\('---specials---'\\); [print\\(c\\) for c in d if c['isSpecial']]; print\\('---champions---'\\); [print\\(c\\) for c in d if c['isChampion'] and not c['isCommander']]\")",
+      "Bash(python -c 'import sys,json; d=json.load\\(sys.stdin\\); regs=[c for c in d if not c['\\\\''isSpecial'\\\\''] and not c['\\\\''isCommander'\\\\''] and not c['\\\\''isChampion'\\\\'']]; print\\('\\\\''regular count:'\\\\'', len\\(regs\\)\\) *)"
+    ]
+  }
+}
