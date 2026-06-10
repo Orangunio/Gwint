@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Warstwa Infrastruktury (Adaptery).
+    Tutaj żyją szczegóły technologiczne: EF Core, baza PostgreSQL, BCrypt, JWT.
+    Implementuje porty zdefiniowane w warstwie Application. Dzięki odwróceniu
+    zależności to infrastruktura zależy od abstrakcji domeny/aplikacji,
+    a nie odwrotnie.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Gwint.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.13" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.3.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gwint.Application\Gwint.Application.csproj" />
+    <ProjectReference Include="..\Gwint.Domain\Gwint.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

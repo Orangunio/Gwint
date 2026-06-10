@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Warstwa Aplikacji.
+    Zależy WYŁĄCZNIE od Domeny. Definiuje porty (interfejsy np. repozytoriów,
+    hashera, generatora tokenów) oraz przypadki użycia (use case'y), które
+    orkiestrują domenę. Nie zna szczegółów technologicznych - posługuje się
+    abstrakcjami (zasada odwrócenia zależności).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Gwint.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gwint.Domain\Gwint.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

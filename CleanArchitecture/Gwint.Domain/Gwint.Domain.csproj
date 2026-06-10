@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Warstwa Domeny.
+    ZASADA CLEAN ARCHITECTURE: ten projekt nie ma ŻADNYCH referencji do
+    frameworków (EF Core, ASP.NET, BCrypt itp.). Jest całkowicie wolny od
+    technologii - zawiera wyłącznie model domeny (encje, obiekty wartości,
+    agregaty) oraz reguły biznesowe.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Gwint.Domain</RootNamespace>
+  </PropertyGroup>
+
+</Project>

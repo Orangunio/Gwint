@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Warstwa prezentacji / kompozycji (Composition Root).
+    Cienkie kontrolery HTTP + DTO zachowujące kontrakt frontendu.
+    To tutaj porty są spinane z adapterami (wstrzykiwanie zależności).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Gwint.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gwint.Application\Gwint.Application.csproj" />
+    <ProjectReference Include="..\Gwint.Infrastructure\Gwint.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
